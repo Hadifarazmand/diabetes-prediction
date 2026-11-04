@@ -1,19 +1,26 @@
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 from pathlib import Path
-from sklearn.model_selection import train_test_split
+
+from sklearn.model_selection import StratifiedKFold, cross_validate
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.pipeline import Pipeline
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.pipeline import Pipeline as SkPipeline
+from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import make_scorer, precision_score, recall_score, f1_score
 
-st.set_page_config(page_title="پیش‌بینی دیابت", page_icon="🩺", layout="centered")
+from imblearn.pipeline import Pipeline
+from imblearn.over_sampling import SMOTE
+from xgboost import XGBClassifier
 
-st.title("🩺 سامانه پیش‌بینی اولیه دیابت")
-st.write("اطلاعات زیر را وارد کنید تا مدل، نتیجه تخمینی خود را نمایش دهد.")
-st.warning("این ابزار صرفاً آموزشی است و جایگزین تشخیص پزشک نیست.")
+st.set_page_config(page_title="پیش‌بینی دیابت", page_icon="🩺", layout="wide")
+st.title("🩺 سامانه پژوهشی پیش‌بینی دیابت")
+st.caption("مقایسه الگوریتم‌های یادگیری ماشین")
+
+st.warning("این سامانه آموزشی و پژوهشی است و جایگزین تشخیص پزشک نیست.")
 
 DATA_PATH = Path(__file__).parent / "dataset" / "diabetes.csv"
 
@@ -22,89 +29,104 @@ FEATURES = [
     "sudden weight loss", "weakness", "Polyphagia",
     "visual blurring", "Itching", "delayed healing"
 ]
+
 CATEGORICAL = FEATURES[1:]
 
 @st.cache_resource
-def train_model():
+def train_models():
     df = pd.read_csv(DATA_PATH)
+
     for col in CATEGORICAL:
         df[col] = df[col].astype(str).str.strip().str.title()
 
+    df["class"] = df["class"].astype(str).str.strip().str.title()
+
     X = df[FEATURES].copy()
     X["Age"] = pd.to_numeric(X["Age"], errors="coerce")
-    df["class"] = df["class"].astype(str).str.strip().str.title()
-    valid = X["Age"].notna() & df["class"].isin(["Positive", "Negative"])
-    X = X.loc[valid]
-    y = df.loc[valid, "class"]
+    y = df["class"]
+
+    valid = X["Age"].notna() & y.isin(["Positive", "Negative"])
+    X, y = X.loc[valid], y.loc[valid]
+
+    y = y.map({"Negative": 0, "Positive": 1})
 
     preprocessor = ColumnTransformer([
-        ("categorical", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL),
-        ("age", "passthrough", ["Age"])
+        ("cat", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL),
+        ("age", StandardScaler(), ["Age"])
     ])
 
-    model = Pipeline([
+    models = {
+        "Random Forest": RandomForestClassifier(
+            n_estimators=200, random_state=42, class_weight="balanced"
+        ),
+        "Extra Trees": ExtraTreesClassifier(
+            n_estimators=200, random_state=42, class_weight="balanced"
+        ),
+        "Logistic Regression": LogisticRegression(
+            max_iter=2000, class_weight="balanced"
+        ),
+        "XGBoost": XGBClassifier(
+            n_estimators=150, max_depth=3, learning_rate=0.05,
+            eval_metric="logloss", random_state=42
+        )
+    }
+
+    cv = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)
+
+    scoring = {
+        "accuracy": "accuracy",
+        "precision": "precision",
+        "recall": "recall",
+        "f1": "f1",
+        "roc_auc": "roc_auc"
+    }
+
+    results = {}
+    for name, classifier in models.items():
+        pipeline = Pipeline([
+            ("preprocessor", preprocessor),
+            ("smote", SMOTE(random_state=42)),
+            ("model", classifier)
+        ])
+
+        scores = cross_validate(
+            pipeline, X, y, cv=cv, scoring=scoring, n_jobs=-1
+        )
+
+        results[name] = {
+            metric: scores["test_" + metric].mean()
+            for metric in scoring
+        }
+
+    final_model = Pipeline([
         ("preprocessor", preprocessor),
-        ("classifier", RandomForestClassifier(
+        ("smote", SMOTE(random_state=42)),
+        ("model", RandomForestClassifier(
             n_estimators=200, random_state=42, class_weight="balanced"
         ))
     ])
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
-    model.fit(X_train, y_train)
-    accuracy = accuracy_score(y_test, model.predict(X_test))
-    model.fit(X, y)
-    return model, accuracy
+    final_model.fit(X, y)
+
+    return results, final_model
 
 if not DATA_PATH.exists():
-    st.error("فایل دیتاست پیدا نشد. باید dataset/diabetes.csv را به مخزن اضافه کنید.")
+    st.error("فایل dataset/diabetes.csv پیدا نشد.")
     st.stop()
 
-model, accuracy = train_model()
+try:
+    results, model = train_models()
+except Exception as e:
+    st.error(f"خطا در آموزش مدل: {e}")
+    st.stop()
 
-st.caption(f"دقت مدل روی داده‌های آزمون: {accuracy * 100:.1f}%")
+st.subheader("نتایج مقایسه الگوریتم‌ها")
 
-with st.form("diabetes_form"):
-    age = st.number_input("سن", min_value=1, max_value=120, value=35)
-    gender = st.selectbox("جنسیت", ["Male", "Female"], format_func=lambda x: "مرد" if x == "Male" else "زن")
+result_df = pd.DataFrame(results).T * 100
+result_df.columns = ["Accuracy", "Precision", "Recall", "F1-score", "ROC-AUC"]
+st.dataframe(result_df.round(2), use_container_width=True)
 
-    labels = {
-        "Polyuria": "ادرار بیش از حد",
-        "Polydipsia": "تشنگی بیش از حد",
-        "sudden weight loss": "کاهش وزن ناگهانی",
-        "weakness": "ضعف عمومی",
-        "Polyphagia": "افزایش اشتها",
-        "visual blurring": "تاری دید",
-        "Itching": "خارش",
-        "delayed healing": "تأخیر در بهبود زخم"
-    }
+best_model = result_df["F1-score"].idxmax()
+st.success(f"بهترین الگوریتم بر اساس F1-score: {best_model}")
 
-    answers = {}
-    for feature, label in labels.items():
-        answers[feature] = st.radio(
-            label, ["No", "Yes"],
-            format_func=lambda x: "خیر" if x == "No" else "بله",
-            horizontal=True
-        )
-
-    submitted = st.form_submit_button("بررسی اطلاعات")
-
-if submitted:
-    row = {"Age": age, "Gender": gender, **answers}
-    prediction_input = pd.DataFrame([row], columns=FEATURES)
-    probabilities = model.predict_proba(prediction_input)[0]
-    classes = list(model.named_steps["classifier"].classes_)
-    positive_probability = float(probabilities[classes.index("Positive")])
-    prediction = model.predict(prediction_input)[0]
-
-    st.subheader("نتیجه مدل")
-    if prediction == "Positive":
-        st.error("مدل، الگوی مشابه موارد مثبت در دیتاست شناسایی کرده است.")
-    else:
-        st.success("مدل، الگوی مشابه موارد منفی در دیتاست شناسایی کرده است.")
-
-    st.metric("احتمال تخمینی خروجی مثبت مدل", f"{positive_probability * 100:.1f}%")
-    st.progress(positive_probability)
-    st.caption("این درصد، احتمال خروجی مدل است و به معنی احتمال واقعی ابتلا به دیابت نیست.")
-
+st.info("مدل نهایی فعلاً Random Forest است؛ انتخاب خودکار بهترین مدل در مرحله بعد اضافه می‌شود.")
