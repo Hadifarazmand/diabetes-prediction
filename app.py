@@ -889,13 +889,28 @@ def show_patient_analysis():
 
         st.subheader("نتیجه تحلیل بیمار")
 
+        # نتیجه بیمار دارای دیابت: پس‌زمینه سفید و متن قرمز
+
         if result["prediction"] == 1:
 
             st.markdown("""
-            <div class="result-white">
+            <div style="
+                background-color: #FFFFFF;
+                border: 1px solid #F1B8B8;
+                border-right: 5px solid #DC3545;
+                border-radius: 12px;
+                padding: 18px;
+                margin: 12px 0;
+                color: #DC3545;
+                font-size: 18px;
+                font-weight: 800;
+                line-height: 2;
+            ">
                 نتیجه مدل: دیابت دارد
             </div>
             """, unsafe_allow_html=True)
+
+        # نتیجه بیمار بدون دیابت: همان پس‌زمینه آبی و متن سفید قبلی
 
         else:
 
