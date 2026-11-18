@@ -47,13 +47,15 @@ st.set_page_config(
 
 
 # ==================================================
-# 2. طراحی و رنگ‌بندی
+# 2. طراحی کامل رابط کاربری و اصلاح رنگ‌ها
 # ==================================================
 
 st.markdown("""
 <style>
 
 @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap');
+
+/* تنظیم فونت و رنگ پایه */
 
 html, body, [class*="css"] {
     font-family: 'Vazirmatn', sans-serif !important;
@@ -64,9 +66,13 @@ html, body, [class*="css"] {
     color: #24364B;
 }
 
-/* تیترهای اصلی */
+/* تیترها */
 
-h1, h2, h3, h4 {
+.stApp h1,
+.stApp h2,
+.stApp h3,
+.stApp h4,
+.stApp h5 {
     color: #17365D !important;
     font-family: 'Vazirmatn', sans-serif !important;
     font-weight: 800 !important;
@@ -74,46 +80,47 @@ h1, h2, h3, h4 {
 
 /* متن‌های معمولی */
 
-.stApp p,
-.stApp label,
-.stApp [data-testid="stMarkdownContainer"] {
+.stApp [data-testid="stMarkdownContainer"] p {
     color: #26394F;
+}
+
+.stApp label {
+    color: #24364B !important;
+    font-weight: 600 !important;
 }
 
 /* منوی کناری */
 
 section[data-testid="stSidebar"] {
-    background-color: #142D4E;
+    background-color: #142D4E !important;
 }
 
-section[data-testid="stSidebar"] h1,
-section[data-testid="stSidebar"] h2,
-section[data-testid="stSidebar"] h3,
-section[data-testid="stSidebar"] p,
-section[data-testid="stSidebar"] label,
-section[data-testid="stSidebar"] span {
+section[data-testid="stSidebar"] * {
+    color: #FFFFFF !important;
+    font-family: 'Vazirmatn', sans-serif !important;
+}
+
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
     color: #FFFFFF !important;
 }
 
-/* تیتر اصلی بالای صفحه */
+/* سربرگ */
 
 .hero {
     background: linear-gradient(120deg, #142D4E, #176B87);
     padding: 27px;
     border-radius: 16px;
     margin-bottom: 25px;
-    color: #FFFFFF;
 }
 
 .hero-title {
     color: #FFFFFF !important;
     font-size: 27px;
     font-weight: 800;
-    margin: 0;
 }
 
 .hero-description {
-    color: #E4F1F8 !important;
+    color: #EAF4FA !important;
     margin-top: 12px;
     font-size: 14px;
 }
@@ -121,39 +128,96 @@ section[data-testid="stSidebar"] span {
 /* کارت‌های آماری */
 
 div[data-testid="stMetric"] {
-    background-color: #FFFFFF;
+    background-color: #FFFFFF !important;
     border: 1px solid #DCE5EF;
     padding: 18px;
     border-radius: 14px;
     box-shadow: 0 3px 12px rgba(20,45,78,0.05);
 }
 
-div[data-testid="stMetricLabel"] {
+div[data-testid="stMetricLabel"],
+div[data-testid="stMetricLabel"] p {
     color: #43566D !important;
 }
 
-div[data-testid="stMetricValue"] {
+div[data-testid="stMetricValue"],
+div[data-testid="stMetricValue"] div {
     color: #17365D !important;
-    font-weight: 800;
+    font-weight: 800 !important;
 }
 
-/* ورودی‌ها */
+/* ورودی‌های متنی و عددی */
 
-div[data-testid="stSelectbox"] > div > div {
-    background-color: #FFFFFF;
-    border-radius: 9px;
-}
-
-div[data-testid="stNumberInput"] input {
-    background-color: #FFFFFF;
+.stApp input,
+.stApp textarea {
+    background-color: #FFFFFF !important;
     color: #17365D !important;
-    border-radius: 9px;
+    -webkit-text-fill-color: #17365D !important;
+    border: 1px solid #B8C9D9 !important;
+    border-radius: 9px !important;
+    font-family: 'Vazirmatn', sans-serif !important;
 }
 
-/* فرم */
+/* فهرست‌های انتخابی */
+
+.stApp [data-baseweb="select"] > div {
+    background-color: #FFFFFF !important;
+    color: #17365D !important;
+    border-color: #B8C9D9 !important;
+}
+
+/* متن انتخاب‌شده در selectbox */
+
+.stApp [data-baseweb="select"] span,
+.stApp [data-baseweb="select"] div,
+.stApp [data-baseweb="select"] input {
+    color: #17365D !important;
+    -webkit-text-fill-color: #17365D !important;
+}
+
+/* آیکون فلش selectbox */
+
+.stApp [data-baseweb="select"] svg {
+    fill: #17365D !important;
+    color: #17365D !important;
+}
+
+/* منوی بازشونده selectbox */
+
+div[data-baseweb="popover"],
+div[data-baseweb="menu"],
+ul[data-testid="stSelectboxVirtualDropdown"] {
+    background-color: #FFFFFF !important;
+}
+
+div[data-baseweb="popover"] *,
+div[data-baseweb="menu"] *,
+ul[data-testid="stSelectboxVirtualDropdown"] * {
+    color: #17365D !important;
+    -webkit-text-fill-color: #17365D !important;
+    font-family: 'Vazirmatn', sans-serif !important;
+}
+
+li[role="option"] {
+    background-color: #FFFFFF !important;
+    color: #17365D !important;
+}
+
+li[role="option"]:hover {
+    background-color: #E5F1FA !important;
+}
+
+/* گزینه انتخاب‌شده */
+
+li[aria-selected="true"] {
+    background-color: #DCECF7 !important;
+    color: #17365D !important;
+}
+
+/* فرم دریافت اطلاعات بیمار */
 
 div[data-testid="stForm"] {
-    background-color: #FFFFFF;
+    background-color: #FFFFFF !important;
     border: 1px solid #DCE5EF;
     border-radius: 15px;
     padding: 20px;
@@ -163,24 +227,44 @@ div[data-testid="stForm"] {
 
 .stButton > button,
 .stFormSubmitButton > button {
-    background-color: #176B87;
+    background-color: #176B87 !important;
     color: #FFFFFF !important;
-    border: none;
+    border: none !important;
     border-radius: 10px;
     padding: 10px 20px;
     font-weight: 700;
+    font-family: 'Vazirmatn', sans-serif !important;
+}
+
+.stButton > button p,
+.stFormSubmitButton > button p {
+    color: #FFFFFF !important;
 }
 
 .stButton > button:hover,
 .stFormSubmitButton > button:hover {
-    background-color: #10536B;
+    background-color: #10536B !important;
     color: #FFFFFF !important;
 }
 
-/* پیام راهنما */
+/* پیام‌های راهنما */
+
+div[data-testid="stAlert"] {
+    background-color: #E5F1FA !important;
+    border: 1px solid #B8D6E9 !important;
+    border-radius: 10px !important;
+}
+
+div[data-testid="stAlert"] p,
+div[data-testid="stAlert"] span,
+div[data-testid="stAlert"] div {
+    color: #17365D !important;
+}
+
+/* کادر راهنما */
 
 .notice {
-    background-color: #E5F1FA;
+    background-color: #E5F1FA !important;
     border-right: 5px solid #176B87;
     border-radius: 10px;
     padding: 16px;
@@ -189,8 +273,14 @@ div[data-testid="stForm"] {
     margin: 12px 0;
 }
 
+.notice b {
+    color: #102C4C !important;
+}
+
+/* کادر موفقیت */
+
 .success-box {
-    background-color: #E5F5EC;
+    background-color: #E5F5EC !important;
     border-right: 5px solid #198754;
     border-radius: 10px;
     padding: 17px;
@@ -198,8 +288,14 @@ div[data-testid="stForm"] {
     line-height: 2;
 }
 
+.success-box b {
+    color: #14532D !important;
+}
+
+/* کادر هشدار */
+
 .warning-box {
-    background-color: #FFF3DF;
+    background-color: #FFF3DF !important;
     border-right: 5px solid #E59B27;
     border-radius: 10px;
     padding: 17px;
@@ -207,17 +303,42 @@ div[data-testid="stForm"] {
     line-height: 2;
 }
 
+.warning-box b {
+    color: #754C00 !important;
+}
+
 /* جدول */
 
 div[data-testid="stDataFrame"] {
-    background-color: #FFFFFF;
+    background-color: #FFFFFF !important;
     border-radius: 12px;
+}
+
+/* بخش‌های بازشونده */
+
+details {
+    background-color: #FFFFFF;
+    border: 1px solid #DCE5EF;
+    border-radius: 10px;
+    padding: 8px;
+}
+
+details summary {
+    color: #17365D !important;
+    font-weight: 700;
 }
 
 /* جداکننده */
 
 hr {
     border-color: #DCE5EF;
+}
+
+/* راهنمای کوچک */
+
+.stCaption,
+[data-testid="stCaptionContainer"] {
+    color: #52657D !important;
 }
 
 </style>
@@ -297,11 +418,9 @@ def load_dataset():
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
-
     df.dropna(subset=[TARGET], inplace=True)
 
     df = df[df[TARGET].isin([0, 1])].copy()
-
     df[TARGET] = df[TARGET].astype(int)
 
     df["gender"] = (
@@ -434,12 +553,10 @@ def build_pipeline(classifier):
         ("encoder", OneHotEncoder(handle_unknown="ignore"))
     ])
 
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ("numeric", numeric_pipeline, NUMERICAL_FEATURES),
-            ("categorical", categorical_pipeline, CATEGORICAL_FEATURES)
-        ]
-    )
+    preprocessor = ColumnTransformer([
+        ("numeric", numeric_pipeline, NUMERICAL_FEATURES),
+        ("categorical", categorical_pipeline, CATEGORICAL_FEATURES)
+    ])
 
     return Pipeline([
         ("preprocessor", preprocessor),
@@ -457,9 +574,7 @@ def train_one_model(algorithm_name):
 
     algorithms = get_algorithms()
 
-    model = build_pipeline(
-        algorithms[algorithm_name]
-    )
+    model = build_pipeline(algorithms[algorithm_name])
 
     start_time = time.perf_counter()
 
@@ -480,27 +595,22 @@ def train_one_model(algorithm_name):
     correct = int(np.sum(np.asarray(y_test) == y_pred))
     incorrect = int(np.sum(np.asarray(y_test) != y_pred))
 
+    accuracy = accuracy_score(y_test, y_pred)
+
     metrics = {
 
         "Algorithm": algorithm_name,
-
         "Total": len(y_test),
-
         "Correct": correct,
-
         "Incorrect": incorrect,
 
         "TN": int(tn),
-
         "FP": int(fp),
-
         "FN": int(fn),
-
         "TP": int(tp),
 
-        "Accuracy": accuracy_score(y_test, y_pred),
-
-        "Error Rate": 1 - accuracy_score(y_test, y_pred),
+        "Accuracy": accuracy,
+        "Error Rate": 1 - accuracy,
 
         "Precision": precision_score(
             y_test, y_pred, zero_division=0
@@ -577,10 +687,8 @@ def show_dataset_info():
 
     st.markdown("### توزیع وضعیت دیابت")
 
-    counts = (
-        df[TARGET]
-        .value_counts()
-        .reindex([0, 1], fill_value=0)
+    counts = df[TARGET].value_counts().reindex(
+        [0, 1], fill_value=0
     )
 
     chart_data = pd.DataFrame({
@@ -701,26 +809,19 @@ def show_patient_analysis():
             "در حال حاضر مصرف می‌کنم": "current",
             "قبلاً مصرف می‌کردم": "former",
             "سابقه مصرف دارم": "ever",
-            "اطلاعاتی ندارم": "No Info",
+            "اطلاعاتی ندارم": "no info",
             "در حال حاضر مصرف نمی‌کنم": "not current"
         }
 
         patient_data = pd.DataFrame([{
 
             "gender": "Female" if gender == "زن" else "Male",
-
             "age": age,
-
             "hypertension": 1 if hypertension == "بله" else 0,
-
             "heart_disease": 1 if heart_disease == "بله" else 0,
-
             "smoking_history": smoking_mapping[smoking_history],
-
             "bmi": bmi,
-
             "HbA1c_level": hba1c,
-
             "blood_glucose_level": glucose
 
         }])
@@ -736,9 +837,7 @@ def show_patient_analysis():
                     )
 
                     st.session_state.trained_models[selected_algorithm] = model
-
                     st.session_state.model_metrics[selected_algorithm] = metrics
-
                     st.session_state.model_predictions[selected_algorithm] = predictions
 
             model = st.session_state.trained_models[selected_algorithm]
@@ -763,11 +862,8 @@ def show_patient_analysis():
         st.subheader("نتیجه تحلیل بیمار")
 
         if result["prediction"] == 1:
-
             st.error("نتیجه مدل: دیابت دارد")
-
         else:
-
             st.success("نتیجه مدل: دیابت ندارد")
 
         st.write(
@@ -783,7 +879,7 @@ def show_patient_analysis():
 
 
 # ==================================================
-# 14. آموزش تمام الگوریتم‌ها
+# 14. آموزش همه الگوریتم‌ها
 # ==================================================
 
 def train_all_models():
@@ -791,7 +887,6 @@ def train_all_models():
     algorithms = list(get_algorithms().keys())
 
     progress = st.progress(0)
-
     status = st.empty()
 
     for i, name in enumerate(algorithms):
@@ -803,9 +898,7 @@ def train_all_models():
             model, metrics, predictions = train_one_model(name)
 
             st.session_state.trained_models[name] = model
-
             st.session_state.model_metrics[name] = metrics
-
             st.session_state.model_predictions[name] = predictions
 
         except Exception as e:
@@ -822,9 +915,6 @@ def train_all_models():
 # ==================================================
 
 def show_patient_counts(algorithm_name):
-
-    if algorithm_name not in st.session_state.model_metrics:
-        return
 
     metrics = st.session_state.model_metrics[algorithm_name]
 
@@ -846,23 +936,9 @@ def show_patient_counts(algorithm_name):
 
     c1, c2, c3 = st.columns(3)
 
-    with c1:
-        st.metric(
-            "تعداد تشخیص درست",
-            f"{correct:,}"
-        )
-
-    with c2:
-        st.metric(
-            "تعداد تشخیص اشتباه",
-            f"{incorrect:,}"
-        )
-
-    with c3:
-        st.metric(
-            "مجموع بیماران آزمون",
-            f"{total:,}"
-        )
+    c1.metric("تعداد تشخیص درست", f"{correct:,}")
+    c2.metric("تعداد تشخیص اشتباه", f"{incorrect:,}")
+    c3.metric("مجموع بیماران آزمون", f"{total:,}")
 
     st.markdown("#### تفکیک دقیق نتایج")
 
@@ -900,17 +976,16 @@ def show_patient_counts(algorithm_name):
 
     st.markdown("#### نمودار تعداد تشخیص‌ها")
 
-    chart = pd.DataFrame({
-        "تعداد": [correct, incorrect]
-    }, index=["تشخیص درست", "تشخیص اشتباه"])
+    chart = pd.DataFrame(
+        {"تعداد": [correct, incorrect]},
+        index=["تشخیص درست", "تشخیص اشتباه"]
+    )
 
     st.bar_chart(chart)
 
     st.caption(
         "تمام اعداد این قسمت تعداد واقعی رکوردهای مجموعه آزمون هستند، نه درصد."
     )
-
-    # ماتریس درهم‌ریختگی
 
     st.markdown("#### ماتریس درهم‌ریختگی")
 
@@ -935,17 +1010,15 @@ def show_patient_counts(algorithm_name):
 
     ax.set_title(
         f"Confusion Matrix - {algorithm_name}",
-        color="#17365D",
-        fontsize=12
+        color="#17365D"
     )
 
     st.pyplot(fig)
-
     plt.close(fig)
 
 
 # ==================================================
-# 16. مقایسه الگوریتم‌ها
+# 16. صفحه تحلیل و مقایسه الگوریتم‌ها
 # ==================================================
 
 def show_algorithm_analysis():
@@ -954,8 +1027,8 @@ def show_algorithm_analysis():
 
     st.markdown("""
     <div class="notice">
-    در این بخش می‌توانید الگوریتم‌ها را آموزش دهید و تعداد
-    بیمارانی را که درست یا اشتباه تشخیص داده‌اند مشاهده کنید.
+        در این بخش می‌توانید الگوریتم‌های یادگیری ماشین را آموزش دهید
+        و تعداد بیمارانی را که درست یا اشتباه تشخیص داده‌اند مشاهده کنید.
     </div>
     """, unsafe_allow_html=True)
 
@@ -963,12 +1036,9 @@ def show_algorithm_analysis():
         "آموزش و ارزیابی همه الگوریتم‌ها",
         use_container_width=True
     ):
-
         train_all_models()
 
-    available = list(
-        st.session_state.trained_models.keys()
-    )
+    available = list(st.session_state.trained_models.keys())
 
     if not available:
 
@@ -980,13 +1050,14 @@ def show_algorithm_analysis():
 
     st.divider()
 
+    st.markdown("### انتخاب الگوریتم")
+
     selected = st.selectbox(
         "الگوریتم موردنظر را انتخاب کنید",
         available,
         key="analysis_algorithm"
     )
 
-    # نمایش تعداد واقعی بیماران درست و اشتباه
     show_patient_counts(selected)
 
     metrics = st.session_state.model_metrics[selected]
@@ -997,39 +1068,17 @@ def show_algorithm_analysis():
 
     c1, c2, c3 = st.columns(3)
 
-    c1.metric(
-        "Accuracy",
-        f"{metrics['Accuracy'] * 100:.2f}%"
-    )
+    c1.metric("Accuracy", f"{metrics['Accuracy'] * 100:.2f}%")
+    c2.metric("Error Rate", f"{metrics['Error Rate'] * 100:.2f}%")
+    c3.metric("Training Time", f"{metrics['Training Time']:.3f} ثانیه")
 
-    c2.metric(
-        "Error Rate",
-        f"{metrics['Error Rate'] * 100:.2f}%"
-    )
-
-    c3.metric(
-        "Training Time",
-        f"{metrics['Training Time']:.3f} ثانیه"
-    )
-
-    with st.expander("مشاهده جزئیات سایر معیارها"):
+    with st.expander("مشاهده سایر معیارهای آماری"):
 
         a, b, c = st.columns(3)
 
-        a.metric(
-            "Precision",
-            f"{metrics['Precision'] * 100:.2f}%"
-        )
-
-        b.metric(
-            "Recall",
-            f"{metrics['Recall'] * 100:.2f}%"
-        )
-
-        c.metric(
-            "F1-score",
-            f"{metrics['F1-score'] * 100:.2f}%"
-        )
+        a.metric("Precision", f"{metrics['Precision'] * 100:.2f}%")
+        b.metric("Recall", f"{metrics['Recall'] * 100:.2f}%")
+        c.metric("F1-score", f"{metrics['F1-score'] * 100:.2f}%")
 
         st.metric(
             "Balanced Accuracy",
@@ -1038,7 +1087,7 @@ def show_algorithm_analysis():
 
     st.divider()
 
-    st.markdown("### جدول مقایسه تمام الگوریتم‌ها")
+    st.markdown("### جدول مقایسه الگوریتم‌ها")
 
     rows = []
 
@@ -1047,32 +1096,15 @@ def show_algorithm_analysis():
         rows.append({
 
             "Algorithm": name,
-
             "Total Patients": result["Total"],
-
             "Correct": result["Correct"],
-
             "Incorrect": result["Incorrect"],
+            "Accuracy (%)": round(result["Accuracy"] * 100, 2),
+            "Precision (%)": round(result["Precision"] * 100, 2),
+            "Recall (%)": round(result["Recall"] * 100, 2),
+            "F1-score (%)": round(result["F1-score"] * 100, 2),
+            "Training Time (s)": round(result["Training Time"], 3)
 
-            "Accuracy (%)": round(
-                result["Accuracy"] * 100, 2
-            ),
-
-            "Precision (%)": round(
-                result["Precision"] * 100, 2
-            ),
-
-            "Recall (%)": round(
-                result["Recall"] * 100, 2
-            ),
-
-            "F1-score (%)": round(
-                result["F1-score"] * 100, 2
-            ),
-
-            "Training Time (s)": round(
-                result["Training Time"], 3
-            )
         })
 
     comparison = pd.DataFrame(rows)
@@ -1113,14 +1145,14 @@ def show_about():
     با استفاده از الگوریتم‌های یادگیری ماشین طراحی شده است.
 
     اطلاعات پزشکی و ویژگی‌های فردی به‌عنوان ورودی دریافت می‌شوند
-    و الگوریتم‌های مختلف، وضعیت دیابت را در دو کلاس
+    و الگوریتم‌های مختلف وضعیت دیابت را در دو کلاس
     مبتلا و غیرمبتلا پیش‌بینی می‌کنند.
 
     **دیتاست:** Diabetes Prediction Dataset
 
     **منبع دیتاست:** Kaggle
 
-    **کتابخانه‌ها و فناوری‌ها:**
+    **فناوری‌ها و کتابخانه‌ها:**
 
     - Python
     - Streamlit
@@ -1137,8 +1169,8 @@ def show_about():
 
     st.markdown("""
     <div class="warning-box">
-    این سامانه یک پروژه پژوهشی و آموزشی است و خروجی آن
-    جایگزین تشخیص قطعی پزشک نیست.
+        این سامانه یک پروژه پژوهشی و آموزشی است و خروجی آن
+        جایگزین تشخیص قطعی پزشک نیست.
     </div>
     """, unsafe_allow_html=True)
 
@@ -1198,3 +1230,4 @@ elif page == "تحلیل و مقایسه الگوریتم‌ها":
 elif page == "درباره پروژه":
 
     show_about()
+
