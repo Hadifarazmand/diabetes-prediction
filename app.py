@@ -47,15 +47,13 @@ st.set_page_config(
 
 
 # ==================================================
-# 2. طراحی کامل رابط کاربری و اصلاح رنگ‌ها
+# 2. طراحی رابط کاربری و اصلاح رنگ‌ها
 # ==================================================
 
 st.markdown("""
 <style>
 
 @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap');
-
-/* تنظیم فونت و رنگ پایه */
 
 html, body, [class*="css"] {
     font-family: 'Vazirmatn', sans-serif !important;
@@ -166,8 +164,6 @@ div[data-testid="stMetricValue"] div {
     border-color: #B8C9D9 !important;
 }
 
-/* متن انتخاب‌شده در selectbox */
-
 .stApp [data-baseweb="select"] span,
 .stApp [data-baseweb="select"] div,
 .stApp [data-baseweb="select"] input {
@@ -175,14 +171,12 @@ div[data-testid="stMetricValue"] div {
     -webkit-text-fill-color: #17365D !important;
 }
 
-/* آیکون فلش selectbox */
-
 .stApp [data-baseweb="select"] svg {
     fill: #17365D !important;
     color: #17365D !important;
 }
 
-/* منوی بازشونده selectbox */
+/* منوی بازشونده */
 
 div[data-baseweb="popover"],
 div[data-baseweb="menu"],
@@ -207,14 +201,12 @@ li[role="option"]:hover {
     background-color: #E5F1FA !important;
 }
 
-/* گزینه انتخاب‌شده */
-
 li[aria-selected="true"] {
     background-color: #DCECF7 !important;
     color: #17365D !important;
 }
 
-/* فرم دریافت اطلاعات بیمار */
+/* فرم بیمار */
 
 div[data-testid="stForm"] {
     background-color: #FFFFFF !important;
@@ -247,7 +239,7 @@ div[data-testid="stForm"] {
     color: #FFFFFF !important;
 }
 
-/* پیام‌های راهنما */
+/* پیام‌های عمومی راهنما */
 
 div[data-testid="stAlert"] {
     background-color: #E5F1FA !important;
@@ -259,6 +251,42 @@ div[data-testid="stAlert"] p,
 div[data-testid="stAlert"] span,
 div[data-testid="stAlert"] div {
     color: #17365D !important;
+}
+
+/* پیام اختصاصی انتظار برای مشاهده آمار */
+
+.info-white {
+    background-color: #176B87 !important;
+    border: 1px solid #176B87;
+    border-radius: 10px;
+    padding: 15px;
+    color: #FFFFFF !important;
+    font-weight: 600;
+    line-height: 2;
+}
+
+.info-white * {
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
+}
+
+/* نتیجه اختصاصی مدل */
+
+.result-white {
+    background-color: #176B87 !important;
+    border: 1px solid #176B87;
+    border-radius: 12px;
+    padding: 18px;
+    margin: 12px 0;
+    color: #FFFFFF !important;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 2;
+}
+
+.result-white * {
+    color: #FFFFFF !important;
+    -webkit-text-fill-color: #FFFFFF !important;
 }
 
 /* کادر راهنما */
@@ -862,9 +890,20 @@ def show_patient_analysis():
         st.subheader("نتیجه تحلیل بیمار")
 
         if result["prediction"] == 1:
-            st.error("نتیجه مدل: دیابت دارد")
+
+            st.markdown("""
+            <div class="result-white">
+                نتیجه مدل: دیابت دارد
+            </div>
+            """, unsafe_allow_html=True)
+
         else:
-            st.success("نتیجه مدل: دیابت ندارد")
+
+            st.markdown("""
+            <div class="result-white">
+                نتیجه مدل: دیابت ندارد
+            </div>
+            """, unsafe_allow_html=True)
 
         st.write(
             f"الگوریتم استفاده‌شده: **{result['algorithm']}**"
@@ -1042,9 +1081,11 @@ def show_algorithm_analysis():
 
     if not available:
 
-        st.info(
-            "برای مشاهده آمار، ابتدا دکمه آموزش و ارزیابی همه الگوریتم‌ها را انتخاب کنید."
-        )
+        st.markdown("""
+        <div class="info-white">
+            برای مشاهده آمار، ابتدا دکمه آموزش و ارزیابی همه الگوریتم‌ها را انتخاب کنید.
+        </div>
+        """, unsafe_allow_html=True)
 
         return
 
@@ -1230,4 +1271,3 @@ elif page == "تحلیل و مقایسه الگوریتم‌ها":
 elif page == "درباره پروژه":
 
     show_about()
-
