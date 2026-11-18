@@ -1,16 +1,20 @@
 
 import warnings
-from pathlib import Path
+warnings.filterwarnings("ignore")
 
+from pathlib import Path
+import time
+
+import numpy as np
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 
+from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
@@ -18,8 +22,9 @@ from sklearn.metrics import (
     f1_score,
     roc_auc_score,
     average_precision_score,
+    balanced_accuracy_score,
     confusion_matrix,
-    balanced_accuracy_score
+    classification_report
 )
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -29,41 +34,10 @@ from sklearn.ensemble import (
     GradientBoostingClassifier
 )
 
-warnings.filterwarnings("ignore")
 
-
-# ==================================================
-# 1. تنظیمات اصلی
-# ==================================================
-
-ROOT = Path(__file__).resolve().parent
-DATA_DIR = ROOT / "dataset"
-
-CDC_FILE = DATA_DIR / "cdc_diabetes_health_indicators.csv"
-KAGGLE_FILE = DATA_DIR / "diabetes_prediction_dataset.csv"
-
-CDC_TARGET = "Diabetes_binary"
-KAGGLE_TARGET = "diabetes"
-
-CDC_FEATURES = [
-    "HighBP", "HighChol", "CholCheck", "BMI", "Smoker",
-    "Stroke", "HeartDiseaseorAttack", "PhysActivity",
-    "Fruits", "Veggies", "HvyAlcoholConsump",
-    "AnyHealthcare", "NoDocbcCost", "GenHlth",
-    "MentHlth", "PhysHlth", "DiffWalk", "Sex",
-    "Age", "Education", "Income"
-]
-
-KAGGLE_FEATURES = [
-    "gender", "age", "hypertension", "heart_disease",
-    "smoking_history", "bmi", "HbA1c_level",
-    "blood_glucose_level"
-]
-
-
-# ==================================================
-# 2. تنظیمات صفحه
-# ==================================================
+# =========================================================
+# تنظیمات صفحه
+# =========================================================
 
 st.set_page_config(
     page_title="سامانه هوشمند غربالگری دیابت",
@@ -72,572 +46,818 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "dataset"
 
-# ==================================================
-# 3. طراحی ظاهری
-# ==================================================
+KAGGLE_FILE = DATA_DIR / "diabetes_prediction_dataset.csv"
+CDC_FILE = DATA_DIR / "cdc_diabetes_health_indicators.csv"
+
+
+# =========================================================
+# طراحی و رنگ‌بندی
+# =========================================================
 
 st.markdown("""
 <style>
 
-@import url(
-'https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap'
-);
-
+/* ---------- رنگ‌های اصلی ---------- */
 :root {
-    --primary: #087E8B;
-    --primary-dark: #075B66;
-    --ink: #18313B;
-    --muted: #607584;
-    --surface: #FFFFFF;
-    --page: #F3F7F8;
-    --line: #DCE7E9;
+    --navy: #173B57;
+    --navy-dark: #102D43;
+    --teal: #079B91;
+    --teal-dark: #087F78;
+    --page: #F2F6F9;
+    --white: #FFFFFF;
+    --text: #263746;
+    --muted: #64748B;
+    --border: #DCE5EC;
+    --green: #16865B;
+    --red: #C43D4B;
+    --orange: #C47B20;
 }
 
-html, body, [class*="css"] {
-    font-family: 'Vazirmatn', sans-serif !important;
-}
-
+/* ---------- پس‌زمینه ---------- */
 .stApp {
-    background: var(--page);
-    color: var(--ink);
+    background: var(--page) !important;
+    color: var(--text) !important;
 }
 
-[data-testid="stHeader"] {
-    background: var(--page);
+[data-testid="stAppViewContainer"] {
+    background: var(--page) !important;
+}
+
+[data-testid="stMain"] {
+    background: var(--page) !important;
 }
 
 .block-container {
-    max-width: 1180px;
-    padding-top: 1.5rem;
-    padding-bottom: 2.5rem;
+    padding-top: 1.7rem !important;
+    padding-bottom: 3rem !important;
+    max-width: 1450px !important;
 }
 
-/* متن‌های عمومی */
-
-.stApp p,
-.stApp li,
-.stApp label,
-.stApp [data-testid="stMarkdownContainer"],
-.stApp [data-testid="stWidgetLabel"] {
-    color: var(--ink) !important;
-    font-family: 'Vazirmatn', sans-serif !important;
+/* ---------- متن‌های عمومی ---------- */
+html, body, [class*="st-"] {
+    font-family: Tahoma, Arial, sans-serif !important;
 }
 
-.stApp h1,
-.stApp h2,
-.stApp h3,
-.stApp h4 {
-    color: #173B57 !important;
-    font-family: 'Vazirmatn', sans-serif !important;
+[data-testid="stMarkdownContainer"] {
+    color: var(--text) !important;
 }
 
-/* سربرگ */
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] li,
+[data-testid="stMarkdownContainer"] strong,
+[data-testid="stMarkdownContainer"] em {
+    color: var(--text) !important;
+    line-height: 1.9 !important;
+}
 
+[data-testid="stMarkdownContainer"] h1,
+[data-testid="stMarkdownContainer"] h2,
+[data-testid="stMarkdownContainer"] h3,
+[data-testid="stMarkdownContainer"] h4 {
+    color: var(--navy) !important;
+    font-weight: 800 !important;
+}
+
+[data-testid="stCaptionContainer"],
+[data-testid="stCaptionContainer"] p {
+    color: var(--muted) !important;
+}
+
+[data-testid="stWidgetLabel"],
+[data-testid="stWidgetLabel"] p,
+[data-testid="stWidgetLabel"] label {
+    color: var(--navy) !important;
+    font-weight: 700 !important;
+}
+
+/* ---------- هدر اصلی ---------- */
 .hero {
-    background: linear-gradient(
-        110deg,
-        #075B66 0%,
-        #087E8B 100%
-    );
-    color: white;
-    padding: 30px;
-    border-radius: 18px;
-    margin-bottom: 20px;
-    box-shadow: 0 8px 24px rgba(7,91,102,.12);
+    background: linear-gradient(120deg, #173B57 0%, #205D75 65%, #079B91 100%);
+    border-radius: 22px;
+    padding: 30px 32px;
+    margin-bottom: 25px;
+    color: #FFFFFF !important;
+    box-shadow: 0 8px 25px rgba(23, 59, 87, 0.13);
+    direction: rtl;
+    text-align: right;
 }
 
 .hero h1 {
-    color: white !important;
+    color: #FFFFFF !important;
     font-size: 27px;
-    font-weight: 800;
-    margin-bottom: 8px;
+    font-weight: 900;
+    margin: 0 0 10px 0;
 }
 
 .hero p {
-    color: #E5F5F6 !important;
+    color: #E6F4F7 !important;
     font-size: 14px;
     margin: 0;
+    line-height: 2;
 }
 
-/* عنوان بخش‌ها */
-
-.section-title {
-    font-size: 19px;
-    font-weight: 800;
-    color: var(--ink);
-    margin: 10px 0 14px 0;
+.hero-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    border-radius: 17px;
+    background: rgba(255,255,255,0.17);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: #FFFFFF !important;
+    font-size: 29px;
+    margin-bottom: 14px;
 }
 
-/* کارت‌های آماری */
+/* ---------- کارت‌ها ---------- */
+.panel {
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 17px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 3px 12px rgba(23, 59, 87, 0.045);
+    direction: rtl;
+    text-align: right;
+}
 
+.panel-title {
+    color: var(--navy) !important;
+    font-size: 17px;
+    font-weight: 900;
+    margin-bottom: 7px;
+}
+
+.panel-description {
+    color: var(--muted) !important;
+    font-size: 13px;
+    line-height: 1.9;
+}
+
+/* ---------- کارت‌های آماری ---------- */
 .stat-card {
-    background: white;
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 16px 12px;
-    text-align: center;
-    min-height: 95px;
-    box-shadow: 0 2px 8px rgba(24,49,59,.035);
+    background: #FFFFFF;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 17px 18px;
+    min-height: 112px;
+    box-shadow: 0 3px 12px rgba(23, 59, 87, 0.04);
+    direction: rtl;
+    text-align: right;
+}
+
+.stat-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 37px;
+    height: 37px;
+    border-radius: 11px;
+    background: #E8F5F4;
+    color: #087F78 !important;
+    font-size: 19px;
+    margin-bottom: 9px;
 }
 
 .stat-label {
-    color: var(--muted) !important;
+    color: #64748B !important;
     font-size: 12px;
     margin-bottom: 5px;
 }
 
 .stat-value {
-    color: var(--primary-dark) !important;
+    color: #173B57 !important;
     font-size: 23px;
+    font-weight: 900;
+}
+
+/* ---------- برچسب‌ها ---------- */
+.section-heading {
+    color: #173B57 !important;
+    font-size: 19px;
+    font-weight: 900;
+    margin: 24px 0 13px 0;
+    direction: rtl;
+    text-align: right;
+}
+
+.info-chip {
+    display: inline-block;
+    background: #E6F4F3;
+    color: #087F78 !important;
+    border: 1px solid #C8E8E5;
+    border-radius: 9px;
+    padding: 6px 11px;
+    font-size: 12px;
     font-weight: 800;
 }
 
-/* دکمه‌ها */
-
-div.stButton > button,
-div.stFormSubmitButton > button {
-    background: var(--primary);
-    color: white !important;
-    border: none;
-    border-radius: 10px;
-    min-height: 44px;
-    font-weight: 700;
-    font-family: 'Vazirmatn', sans-serif !important;
+/* ---------- دکمه‌ها ---------- */
+.stButton > button,
+.stFormSubmitButton > button {
+    background: #079B91 !important;
+    color: #FFFFFF !important;
+    border: 1px solid #079B91 !important;
+    border-radius: 11px !important;
+    min-height: 43px;
+    font-weight: 800 !important;
+    transition: 0.2s ease;
 }
 
-div.stButton > button:hover,
-div.stFormSubmitButton > button:hover {
-    background: var(--primary-dark);
-    color: white !important;
-    border: none;
+.stButton > button *,
+.stFormSubmitButton > button * {
+    color: #FFFFFF !important;
+    fill: #FFFFFF !important;
 }
 
-/* نوار کناری */
-
-[data-testid="stSidebar"] {
-    background: #EAF1F3;
-    border-left: 1px solid var(--line);
+.stButton > button:hover,
+.stFormSubmitButton > button:hover {
+    background: #087F78 !important;
+    border-color: #087F78 !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 4px 13px rgba(7,155,145,0.2);
 }
 
-[data-testid="stSidebar"] p,
-[data-testid="stSidebar"] label,
-[data-testid="stSidebar"] span,
-[data-testid="stSidebar"] div {
-    color: #263B48;
+.stButton > button:disabled {
+    background: #A8C8C5 !important;
+    color: #FFFFFF !important;
 }
 
-/* فرم‌ها و کارت‌ها */
-
-[data-testid="stForm"],
-[data-testid="stExpander"] {
-    background: white;
-    border: 1px solid var(--line);
-    border-radius: 14px;
+/* ---------- فیلدهای ورودی ---------- */
+input, textarea {
+    color: #263746 !important;
+    background: #FFFFFF !important;
+    border-color: #C9D6E0 !important;
+    border-radius: 9px !important;
 }
 
-[data-testid="stMetric"] {
-    background: white;
-    border: 1px solid var(--line);
-    padding: 12px;
-    border-radius: 12px;
+input::placeholder,
+textarea::placeholder {
+    color: #8493A1 !important;
+    opacity: 1 !important;
 }
 
-/* ورودی‌ها */
+[data-baseweb="input"] {
+    background: #FFFFFF !important;
+    border-color: #C9D6E0 !important;
+}
 
-.stApp input,
-.stApp textarea {
-    color: #263B48 !important;
-    background-color: #FFFFFF !important;
+[data-baseweb="input"] input {
+    color: #263746 !important;
+    -webkit-text-fill-color: #263746 !important;
 }
 
 [data-baseweb="select"] > div {
-    background-color: #FFFFFF !important;
-    color: #263B48 !important;
+    background: #FFFFFF !important;
+    border-color: #C9D6E0 !important;
+    color: #263746 !important;
 }
 
-[data-baseweb="popover"] *,
-[data-baseweb="menu"] * {
-    color: #263B48 !important;
+[data-baseweb="select"] span {
+    color: #263746 !important;
 }
 
-/* معیارهای آماری */
-
-[data-testid="stMetricLabel"] {
-    color: #607584 !important;
+[data-baseweb="select"] svg {
+    fill: #173B57 !important;
+    color: #173B57 !important;
 }
 
-[data-testid="stMetricValue"] {
-    color: #075B66 !important;
+[data-baseweb="popover"],
+[data-baseweb="menu"],
+[role="listbox"] {
+    background: #FFFFFF !important;
+    color: #263746 !important;
 }
 
-/* توضیحات */
-
-.stApp [data-testid="stCaptionContainer"],
-.stApp [data-testid="stCaptionContainer"] p {
-    color: #607584 !important;
+[role="option"] {
+    background: #FFFFFF !important;
+    color: #263746 !important;
 }
 
-/* هشدارها */
+[role="option"]:hover {
+    background: #E8F5F4 !important;
+    color: #173B57 !important;
+}
 
+/* ---------- رادیو و چک‌باکس ---------- */
+[data-testid="stRadio"] label,
+[data-testid="stCheckbox"] label {
+    color: #263746 !important;
+}
+
+[data-testid="stRadio"] input,
+[data-testid="stCheckbox"] input {
+    accent-color: #079B91 !important;
+}
+
+[data-testid="stRadio"] svg,
+[data-testid="stCheckbox"] svg {
+    color: #079B91 !important;
+    fill: #079B91 !important;
+}
+
+/* ---------- نوار کناری ---------- */
+[data-testid="stSidebar"] {
+    background: #173B57 !important;
+    border-left: 1px solid #244B65 !important;
+}
+
+[data-testid="stSidebar"] > div {
+    background: #173B57 !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] li,
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] strong,
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"],
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
+[data-testid="stSidebar"] label {
+    color: #F4F8FB !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+    color: #C5D7E3 !important;
+}
+
+[data-testid="stSidebar"] [data-baseweb="select"] > div {
+    background: #FFFFFF !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stRadio"] label {
+    color: #FFFFFF !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stRadio"] svg {
+    color: #48D5C7 !important;
+    fill: #48D5C7 !important;
+}
+
+/* ---------- آیکون‌ها ---------- */
+svg {
+    color: inherit;
+}
+
+[data-testid="stIconMaterial"],
+.material-symbols-rounded,
+.material-icons {
+    color: #079B91 !important;
+    fill: #079B91 !important;
+}
+
+[data-testid="stSidebar"] [data-testid="stIconMaterial"],
+[data-testid="stSidebar"] .material-symbols-rounded,
+[data-testid="stSidebar"] .material-icons {
+    color: #65E0D4 !important;
+    fill: #65E0D4 !important;
+}
+
+[data-testid="stExpander"] summary svg,
+[data-testid="stExpander"] button svg {
+    color: #079B91 !important;
+    fill: #079B91 !important;
+}
+
+/* ---------- تب‌ها ---------- */
+button[data-baseweb="tab"] {
+    color: #526579 !important;
+    font-weight: 700 !important;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: #087F78 !important;
+    border-bottom-color: #079B91 !important;
+}
+
+button[data-baseweb="tab"] svg {
+    color: #079B91 !important;
+    fill: #079B91 !important;
+}
+
+/* ---------- پیام‌ها ---------- */
 [data-testid="stAlert"] {
-    border-radius: 12px;
+    border-radius: 12px !important;
 }
 
-/* جداکننده */
+[data-testid="stAlert"] p,
+[data-testid="stAlert"] div {
+    color: #263746 !important;
+}
 
+[data-testid="stAlert"] svg {
+    color: #087F78 !important;
+    fill: #087F78 !important;
+}
+
+/* ---------- بازشونده ---------- */
+[data-testid="stExpander"] {
+    background: #FFFFFF !important;
+    border: 1px solid #DCE5EC !important;
+    border-radius: 12px !important;
+}
+
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] summary p {
+    color: #173B57 !important;
+    font-weight: 700 !important;
+}
+
+/* ---------- متریک‌های Streamlit ---------- */
+[data-testid="stMetric"] {
+    background: #FFFFFF !important;
+    border: 1px solid #DCE5EC !important;
+    border-radius: 13px !important;
+    padding: 13px !important;
+}
+
+[data-testid="stMetricLabel"],
+[data-testid="stMetricLabel"] p {
+    color: #64748B !important;
+}
+
+[data-testid="stMetricValue"],
+[data-testid="stMetricValue"] div {
+    color: #173B57 !important;
+}
+
+[data-testid="stMetricDelta"] {
+    color: #087F78 !important;
+}
+
+/* ---------- جدول ---------- */
+[data-testid="stDataFrame"] {
+    border: 1px solid #DCE5EC !important;
+    border-radius: 10px !important;
+    overflow: hidden;
+}
+
+/* ---------- جداکننده ---------- */
 hr {
-    border-color: var(--line);
+    border-color: #DCE5EC !important;
 }
 
-/* پانوشت */
-
-footer {
-    visibility: hidden;
+/* ---------- فوتر ---------- */
+.footer {
+    border-top: 1px solid #DCE5EC;
+    margin-top: 35px;
+    padding-top: 18px;
+    text-align: center;
+    color: #718096 !important;
+    font-size: 12px;
+    direction: rtl;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 
-# ==================================================
-# 4. دریافت دیتاست CDC
-# ==================================================
+# =========================================================
+# توابع عمومی
+# =========================================================
 
-@st.cache_data(ttl=86400, show_spinner=False)
-def load_cdc_from_uci():
+def show_header():
+    st.markdown("""
+    <div class="hero">
+        <div class="hero-icon">🩺</div>
+        <h1>سامانه هوشمند غربالگری و پیش‌بینی دیابت</h1>
+        <p>
+            تحلیل داده‌های سلامت با استفاده از الگوریتم‌های یادگیری ماشین
+            برای ارزیابی ریسک ابتلا به دیابت
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    from ucimlrepo import fetch_ucirepo
 
-    dataset = fetch_ucirepo(id=891)
+def section_title(title, description=None):
+    st.markdown(
+        f'<div class="section-heading">{title}</div>',
+        unsafe_allow_html=True
+    )
+    if description:
+        st.caption(description)
 
-    X = dataset.data.features.copy()
-    y = dataset.data.targets.copy()
 
-    if isinstance(y, pd.Series):
-        y = y.to_frame()
+def stat_card(icon, label, value):
+    st.markdown(f"""
+    <div class="stat-card">
+        <div class="stat-icon">{icon}</div>
+        <div class="stat-label">{label}</div>
+        <div class="stat-value">{value}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    if CDC_TARGET not in y.columns:
 
-        if len(y.columns) == 1:
-            y.columns = [CDC_TARGET]
-        else:
-            raise ValueError(
-                "ستون Diabetes_binary پیدا نشد."
-            )
-
-    data = pd.concat(
-        [
-            X.reset_index(drop=True),
-            y[[CDC_TARGET]].reset_index(drop=True)
-        ],
-        axis=1
+def make_styler(df):
+    return (
+        df.style
+        .set_properties(**{
+            "background-color": "#FFFFFF",
+            "color": "#263746",
+            "border-color": "#DCE5EC",
+            "text-align": "center"
+        })
+        .set_table_styles([
+            {
+                "selector": "th",
+                "props": [
+                    ("background-color", "#E8F1F6"),
+                    ("color", "#173B57"),
+                    ("font-weight", "bold"),
+                    ("text-align", "center")
+                ]
+            }
+        ])
     )
 
-    data.columns = [
-        str(c).strip()
-        for c in data.columns
-    ]
 
-    return data
-
-
-# ==================================================
-# 5. خواندن فایل CSV
-# ==================================================
+# =========================================================
+# بارگذاری داده‌ها
+# =========================================================
 
 @st.cache_data(show_spinner=False)
-def read_csv_cached(path_string, modified_time):
+def load_kaggle_data():
+    if not KAGGLE_FILE.exists():
+        raise FileNotFoundError(
+            "فایل diabetes_prediction_dataset.csv در پوشه dataset پیدا نشد."
+        )
 
-    df = pd.read_csv(path_string)
+    df = pd.read_csv(KAGGLE_FILE)
+    df.columns = df.columns.str.strip()
 
-    df.columns = [
-        str(c).strip()
-        for c in df.columns
-    ]
+    if "diabetes" not in df.columns:
+        raise ValueError("ستون هدف diabetes در دیتاست پیدا نشد.")
 
     return df
 
 
-def read_csv(path):
+@st.cache_data(show_spinner=False)
+def load_cdc_data():
+    if CDC_FILE.exists():
+        df = pd.read_csv(CDC_FILE)
+        df.columns = df.columns.str.strip()
+        return df
 
-    if not path.exists():
-        return None
+    try:
+        from ucimlrepo import fetch_ucirepo
 
-    return read_csv_cached(
-        str(path),
-        path.stat().st_mtime
-    )
+        dataset = fetch_ucirepo(id=891)
+        features = dataset.data.features.copy()
+        targets = dataset.data.targets.copy()
 
-
-# ==================================================
-# 6. تبدیل ستون هدف
-# ==================================================
-
-def convert_target(series):
-
-    if series.dtype == "object":
-
-        values = (
-            series.astype(str)
-            .str.strip()
-            .str.lower()
+        df = pd.concat(
+            [features.reset_index(drop=True),
+             targets.reset_index(drop=True)],
+            axis=1
         )
 
-        mapping = {
-            "1": 1,
-            "yes": 1,
-            "positive": 1,
-            "diabetes": 1,
-            "true": 1,
-            "0": 0,
-            "no": 0,
-            "negative": 0,
-            "no diabetes": 0,
-            "false": 0
-        }
+        df.columns = df.columns.str.strip()
+        return df
 
-        result = values.map(mapping)
-
-        if result.isna().any():
-            raise ValueError(
-                "مقادیر ستون هدف نامعتبر هستند."
-            )
-
-        return result.astype(int)
-
-    result = pd.to_numeric(
-        series,
-        errors="coerce"
-    )
-
-    if (
-        result.isna().any()
-        or not set(result.unique()).issubset({0, 1})
-    ):
-        raise ValueError(
-            "ستون هدف باید شامل صفر و یک باشد."
-        )
-
-    return result.astype(int)
+    except Exception as e:
+        raise FileNotFoundError(
+            "دیتاست CDC در پوشه dataset موجود نیست و دریافت خودکار آن نیز موفق نبود. "
+            "فایل cdc_diabetes_health_indicators.csv را در پوشه dataset قرار دهید."
+        ) from e
 
 
-# ==================================================
-# 7. آماده‌سازی داده
-# ==================================================
+# =========================================================
+# آماده‌سازی دیتاست
+# =========================================================
 
-def prepare_data(df, dataset_name, mode):
+KAGGLE_BASIC_FEATURES = [
+    "gender",
+    "age",
+    "hypertension",
+    "heart_disease",
+    "smoking_history",
+    "bmi"
+]
 
-    if dataset_name == "CDC":
+KAGGLE_FULL_FEATURES = KAGGLE_BASIC_FEATURES + [
+    "HbA1c_level",
+    "blood_glucose_level"
+]
 
-        target = CDC_TARGET
-        features = CDC_FEATURES
+CDC_FEATURES = [
+    "HighBP",
+    "HighChol",
+    "CholCheck",
+    "BMI",
+    "Smoker",
+    "Stroke",
+    "HeartDiseaseorAttack",
+    "PhysActivity",
+    "Fruits",
+    "Veggies",
+    "HvyAlcoholConsump",
+    "AnyHealthcare",
+    "NoDocbcCost",
+    "GenHlth",
+    "MentHlth",
+    "PhysHlth",
+    "DiffWalk",
+    "Sex",
+    "Age",
+    "Education",
+    "Income"
+]
 
-    else:
 
-        target = KAGGLE_TARGET
+def prepare_dataset(dataset_name, mode):
+    if dataset_name == "دیتاست Kaggle":
+        df = load_kaggle_data()
 
         if mode == "غربالگری بدون آزمایش":
-
-            features = [
-                "gender",
-                "age",
-                "hypertension",
-                "heart_disease",
-                "smoking_history",
-                "bmi"
-            ]
-
+            features = KAGGLE_BASIC_FEATURES
         else:
+            features = KAGGLE_FULL_FEATURES
 
-            features = KAGGLE_FEATURES
+        missing = [c for c in features + ["diabetes"] if c not in df.columns]
+        if missing:
+            raise ValueError(f"ستون‌های زیر در دیتاست وجود ندارند: {missing}")
 
-    missing = [
-        c for c in features + [target]
-        if c not in df.columns
-    ]
+        X = df[features].copy()
+        y = pd.to_numeric(df["diabetes"], errors="coerce")
 
-    if missing:
-        raise ValueError(
-            "ستون‌های لازم پیدا نشدند: "
-            + ", ".join(missing)
+        valid = y.notna()
+        X = X.loc[valid].copy()
+        y = y.loc[valid].astype(int)
+
+        categorical = [
+            c for c in ["gender", "smoking_history"]
+            if c in X.columns
+        ]
+        numeric = [c for c in features if c not in categorical]
+
+        return X, y, categorical, numeric, (
+            "برچسب مثبت این دیتاست مطابق ستون diabetes است."
         )
 
-    data = df[
-        features + [target]
-    ].dropna(subset=[target]).copy()
+    else:
+        df = load_cdc_data()
 
-    y = convert_target(data[target])
-    X = data[features].copy()
-
-    for col in X.columns:
-
-        if X[col].dtype == "object":
-
-            X[col] = (
-                X[col]
-                .astype(str)
-                .str.strip()
+        if "Diabetes_012" in df.columns:
+            target_col = "Diabetes_012"
+            raw_y = pd.to_numeric(df[target_col], errors="coerce")
+            y = (raw_y > 0).astype(int)
+        elif "Diabetes_binary" in df.columns:
+            target_col = "Diabetes_binary"
+            y = pd.to_numeric(df[target_col], errors="coerce")
+        elif "diabetes" in df.columns:
+            target_col = "diabetes"
+            y = pd.to_numeric(df[target_col], errors="coerce")
+        else:
+            raise ValueError(
+                "ستون هدف دیابت در دیتاست CDC پیدا نشد."
             )
 
-        else:
+        features = [c for c in CDC_FEATURES if c in df.columns]
 
-            X[col] = pd.to_numeric(
-                X[col],
-                errors="coerce"
-            )
+        if not features:
+            raise ValueError("هیچ‌کدام از ستون‌های موردنیاز CDC پیدا نشدند.")
 
-    if y.nunique() != 2:
-        raise ValueError(
-            "دیتاست باید هر دو کلاس را داشته باشد."
+        X = df[features].copy()
+
+        valid = y.notna()
+        X = X.loc[valid].copy()
+        y = y.loc[valid].astype(int)
+
+        categorical = [
+            c for c in ["Sex", "Age", "Education", "Income"]
+            if c in X.columns
+        ]
+        numeric = [c for c in features if c not in categorical]
+
+        return X, y, categorical, numeric, (
+            "در این دیتاست، افراد دارای پیش‌دیابت یا دیابت در گروه مثبت قرار می‌گیرند."
         )
 
-    if y.value_counts().min() < 2:
-        raise ValueError(
-            "تعداد نمونه‌های یکی از کلاس‌ها کافی نیست."
+
+# =========================================================
+# ساخت پیش‌پردازش و الگوریتم‌ها
+# =========================================================
+
+def create_one_hot_encoder():
+    try:
+        return OneHotEncoder(
+            handle_unknown="ignore",
+            sparse_output=False
+        )
+    except TypeError:
+        return OneHotEncoder(
+            handle_unknown="ignore",
+            sparse=False
         )
 
-    return X, y, features
 
-
-# ==================================================
-# 8. ساخت الگوریتم‌ها
-# ==================================================
-
-def build_models(X):
-
-    categorical = X.select_dtypes(
-        include=["object", "category"]
-    ).columns.tolist()
-
-    numeric = [
-        c for c in X.columns
-        if c not in categorical
-    ]
-
+def build_preprocessor(categorical, numeric):
     transformers = []
 
     if numeric:
+        numeric_pipeline = Pipeline([
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler())
+        ])
 
-        transformers.append((
-            "numeric",
-            Pipeline([
-                ("imputer", SimpleImputer(strategy="median")),
-                ("scaler", StandardScaler())
-            ]),
-            numeric
-        ))
+        transformers.append(
+            ("numeric", numeric_pipeline, numeric)
+        )
 
     if categorical:
+        categorical_pipeline = Pipeline([
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("encoder", create_one_hot_encoder())
+        ])
 
-        transformers.append((
-            "categorical",
-            Pipeline([
-                ("imputer", SimpleImputer(strategy="most_frequent")),
-                (
-                    "encoder",
-                    OneHotEncoder(
-                        handle_unknown="ignore",
-                        sparse_output=False
-                    )
-                )
-            ]),
-            categorical
-        ))
+        transformers.append(
+            ("categorical", categorical_pipeline, categorical)
+        )
 
-    preprocessor = ColumnTransformer(
-        transformers=transformers
+    return ColumnTransformer(
+        transformers=transformers,
+        remainder="drop"
     )
 
-    estimators = {
 
-        "Logistic Regression":
-            LogisticRegression(
-                max_iter=1000,
-                class_weight="balanced",
-                random_state=42
-            ),
+def build_models(preprocessor):
+    models = {
+        "رگرسیون لجستیک": LogisticRegression(
+            max_iter=1500,
+            class_weight="balanced",
+            random_state=42
+        ),
 
-        "Decision Tree":
-            DecisionTreeClassifier(
-                max_depth=12,
-                min_samples_leaf=5,
-                class_weight="balanced",
-                random_state=42
-            ),
+        "درخت تصمیم": DecisionTreeClassifier(
+            max_depth=12,
+            min_samples_split=10,
+            class_weight="balanced",
+            random_state=42
+        ),
 
-        "Random Forest":
-            RandomForestClassifier(
-                n_estimators=100,
-                max_features="sqrt",
-                min_samples_leaf=2,
-                class_weight="balanced_subsample",
-                n_jobs=-1,
-                random_state=42
-            ),
+        "جنگل تصادفی": RandomForestClassifier(
+            n_estimators=180,
+            max_depth=18,
+            min_samples_leaf=2,
+            class_weight="balanced",
+            n_jobs=-1,
+            random_state=42
+        ),
 
-        "Extra Trees":
-            ExtraTreesClassifier(
-                n_estimators=100,
-                max_features="sqrt",
-                min_samples_leaf=2,
-                class_weight="balanced",
-                n_jobs=-1,
-                random_state=42
-            ),
+        "درخت‌های بسیار تصادفی": ExtraTreesClassifier(
+            n_estimators=180,
+            max_depth=18,
+            min_samples_leaf=2,
+            class_weight="balanced",
+            n_jobs=-1,
+            random_state=42
+        ),
 
-        "Gradient Boosting":
-            GradientBoostingClassifier(
-                n_estimators=100,
-                learning_rate=0.08,
-                max_depth=3,
-                random_state=42
-            )
+        "گرادیان بوستینگ": GradientBoostingClassifier(
+            n_estimators=100,
+            learning_rate=0.08,
+            max_depth=3,
+            random_state=42
+        )
     }
 
-    models = {}
-
-    for name, estimator in estimators.items():
-
-        models[name] = Pipeline([
-            ("preprocessing", preprocessor),
-            ("model", estimator)
-        ])
-
     try:
-
         from xgboost import XGBClassifier
 
-        models["XGBoost"] = Pipeline([
-            ("preprocessing", preprocessor),
-            (
-                "model",
-                XGBClassifier(
-                    n_estimators=150,
-                    max_depth=5,
-                    learning_rate=0.06,
-                    subsample=0.85,
-                    colsample_bytree=0.85,
-                    reg_lambda=2,
-                    eval_metric="logloss",
-                    tree_method="hist",
-                    n_jobs=2,
-                    random_state=42
-                )
-            )
-        ])
-
-    except ImportError:
+        models["XGBoost"] = XGBClassifier(
+            n_estimators=150,
+            max_depth=5,
+            learning_rate=0.06,
+            subsample=0.85,
+            colsample_bytree=0.85,
+            eval_metric="logloss",
+            random_state=42,
+            n_jobs=-1
+        )
+    except Exception:
         pass
 
-    return models
+    pipelines = {}
+
+    for name, model in models.items():
+        pipelines[name] = Pipeline([
+            ("preprocessor", preprocessor),
+            ("classifier", model)
+        ])
+
+    return pipelines
 
 
-# ==================================================
-# 9. آموزش و ارزیابی
-# ==================================================
+# =========================================================
+# آموزش و ارزیابی
+# =========================================================
 
-def train_and_evaluate(X, y):
+def train_all_models(X, y, categorical, numeric):
+    if y.nunique() < 2:
+        raise ValueError("برای آموزش، دیتاست باید حداقل دو کلاس داشته باشد.")
 
     X_train, X_test, y_train, y_test = train_test_split(
         X,
@@ -647,939 +867,901 @@ def train_and_evaluate(X, y):
         stratify=y
     )
 
-    models = build_models(X)
+    preprocessor = build_preprocessor(categorical, numeric)
+    pipelines = build_models(preprocessor)
 
+    trained = {}
     results = []
-    fitted = {}
-    predictions = {}
 
     progress = st.progress(0)
     status = st.empty()
 
-    for i, (name, model) in enumerate(models.items()):
+    total = len(pipelines)
 
-        status.caption(
-            f"در حال آموزش {name}..."
-        )
+    for index, (name, pipeline) in enumerate(pipelines.items()):
+        status.info(f"در حال آموزش الگوریتم: {name}")
+
+        start = time.time()
+        pipeline.fit(X_train, y_train)
+        elapsed = time.time() - start
+
+        predictions = pipeline.predict(X_test)
 
         try:
+            probabilities = pipeline.predict_proba(X_test)[:, 1]
+            roc = roc_auc_score(y_test, probabilities)
+            pr_auc = average_precision_score(y_test, probabilities)
+        except Exception:
+            roc = np.nan
+            pr_auc = np.nan
 
-            if name == "XGBoost":
+        results.append({
+            "الگوریتم": name,
+            "دقت": accuracy_score(y_test, predictions),
+            "Precision": precision_score(
+                y_test, predictions, zero_division=0
+            ),
+            "Recall": recall_score(
+                y_test, predictions, zero_division=0
+            ),
+            "F1": f1_score(
+                y_test, predictions, zero_division=0
+            ),
+            "ROC-AUC": roc,
+            "PR-AUC": pr_auc,
+            "Balanced Accuracy": balanced_accuracy_score(
+                y_test, predictions
+            ),
+            "زمان آموزش (ثانیه)": elapsed
+        })
 
-                from sklearn.utils.class_weight import (
-                    compute_sample_weight
-                )
+        trained[name] = pipeline
+        progress.progress((index + 1) / total)
 
-                weights = compute_sample_weight(
-                    class_weight="balanced",
-                    y=y_train
-                )
+    status.success("آموزش همه الگوریتم‌ها به پایان رسید.")
 
-                model.fit(
-                    X_train,
-                    y_train,
-                    model__sample_weight=weights
-                )
-
-            else:
-
-                model.fit(
-                    X_train,
-                    y_train
-                )
-
-            pred = model.predict(X_test)
-
-            prob = model.predict_proba(
-                X_test
-            )[:, 1]
-
-            acc = accuracy_score(y_test, pred)
-
-            results.append({
-
-                "Algorithm": name,
-
-                "Accuracy (%)":
-                    acc * 100,
-
-                "Error (%)":
-                    (1 - acc) * 100,
-
-                "Precision (%)":
-                    precision_score(
-                        y_test,
-                        pred,
-                        zero_division=0
-                    ) * 100,
-
-                "Recall (%)":
-                    recall_score(
-                        y_test,
-                        pred,
-                        zero_division=0
-                    ) * 100,
-
-                "F1 (%)":
-                    f1_score(
-                        y_test,
-                        pred,
-                        zero_division=0
-                    ) * 100,
-
-                "ROC-AUC (%)":
-                    roc_auc_score(
-                        y_test,
-                        prob
-                    ) * 100,
-
-                "PR-AUC (%)":
-                    average_precision_score(
-                        y_test,
-                        prob
-                    ) * 100,
-
-                "Balanced Accuracy (%)":
-                    balanced_accuracy_score(
-                        y_test,
-                        pred
-                    ) * 100
-            })
-
-            fitted[name] = model
-
-            predictions[name] = {
-                "predicted": pred,
-                "probability": prob
-            }
-
-        except Exception as exc:
-
-            st.warning(
-                f"مدل {name} اجرا نشد: {exc}"
-            )
-
-        progress.progress(
-            (i + 1) / len(models)
-        )
-
-    progress.empty()
-    status.empty()
-
-    if not results:
-        raise RuntimeError(
-            "هیچ الگوریتمی با موفقیت اجرا نشد."
-        )
-
-    result_df = pd.DataFrame(
-        results
-    ).sort_values(
-        "F1 (%)",
+    results_df = pd.DataFrame(results)
+    results_df = results_df.sort_values(
+        by="F1",
         ascending=False
     ).reset_index(drop=True)
 
-    return (
-        result_df,
-        fitted,
-        predictions,
-        X_test,
-        y_test
-    )
+    return trained, results_df, X_test, y_test
 
 
-# ==================================================
-# 10. سربرگ
-# ==================================================
+# =========================================================
+# مقداردهی اولیه حافظه برنامه
+# =========================================================
 
-st.markdown("""
-<div class="hero">
-    <h1>🩺 سامانه هوشمند غربالگری دیابت</h1>
-    <p>
-        تحلیل داده‌های سلامت و مقایسه الگوریتم‌های یادگیری ماشین
-    </p>
-</div>
-""", unsafe_allow_html=True)
+if "trained_models" not in st.session_state:
+    st.session_state.trained_models = None
+
+if "results_df" not in st.session_state:
+    st.session_state.results_df = None
+
+if "X_test" not in st.session_state:
+    st.session_state.X_test = None
+
+if "y_test" not in st.session_state:
+    st.session_state.y_test = None
+
+if "active_key" not in st.session_state:
+    st.session_state.active_key = None
+
+if "last_prediction" not in st.session_state:
+    st.session_state.last_prediction = None
 
 
-# ==================================================
-# 11. انتخاب دیتاست و نوع تحلیل
-# ==================================================
+# =========================================================
+# نوار کناری
+# =========================================================
 
 with st.sidebar:
+    st.markdown("""
+    <div style="text-align:center; padding:12px 5px 20px 5px;">
+        <div style="
+            width:70px;height:70px;margin:auto;
+            background:#24536E;border:1px solid #4B758D;
+            border-radius:20px;display:flex;
+            align-items:center;justify-content:center;
+            font-size:34px;color:#FFFFFF;">
+            🩺
+        </div>
+        <h3 style="color:#FFFFFF !important;margin-top:13px;">
+            پنل تحلیل دیابت
+        </h3>
+        <p style="color:#C5D7E3 !important;font-size:12px;">
+            سامانه پژوهشی یادگیری ماشین
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    st.markdown("### تنظیمات تحلیل")
+    st.markdown("---")
 
-    dataset_name = st.radio(
-        "انتخاب دیتاست",
-        ["Kaggle", "CDC"]
+    page = st.radio(
+        "بخش موردنظر را انتخاب کنید:",
+        [
+            "داشبورد اصلی",
+            "آموزش و ارزیابی مدل‌ها",
+            "پیش‌بینی بیمار",
+            "درباره پروژه"
+        ],
+        label_visibility="visible"
     )
 
-    mode = "همه ویژگی‌ها"
+    st.markdown("---")
 
-    if dataset_name == "Kaggle":
+    st.markdown(
+        "<p style='color:#FFFFFF;font-weight:800;'>تنظیمات دیتاست</p>",
+        unsafe_allow_html=True
+    )
 
-        mode = st.radio(
+    dataset_name = st.selectbox(
+        "منبع داده",
+        ["دیتاست Kaggle", "دیتاست CDC"]
+    )
+
+    if dataset_name == "دیتاست Kaggle":
+        mode = st.selectbox(
             "نوع تحلیل",
             [
                 "غربالگری بدون آزمایش",
                 "همه ویژگی‌ها"
-            ],
-            help="در حالت اول HbA1c و قند خون وارد مدل نمی‌شوند."
+            ]
         )
-
-    st.divider()
-
-    st.caption(
-        "نسخه پژوهشی و آموزشی"
-    )
-
-
-# ==================================================
-# 12. دریافت دیتاست
-# ==================================================
-
-if dataset_name == "Kaggle":
-
-    df = read_csv(KAGGLE_FILE)
-
-    if df is None:
-
-        st.error(
-            "فایل دیتاست Kaggle پیدا نشد."
-        )
-
-        st.info(
-            "فایل را داخل پوشه dataset قرار بده."
-        )
-
-        st.stop()
-
-else:
-
-    try:
-
-        if CDC_FILE.exists():
-
-            df = read_csv(CDC_FILE)
-
-        else:
-
-            with st.spinner(
-                "در حال دریافت دیتاست CDC..."
-            ):
-
-                df = load_cdc_from_uci()
-
-    except Exception as exc:
-
-        st.error(
-            "دریافت دیتاست CDC ناموفق بود."
-        )
-
-        st.code(str(exc))
-
-        st.stop()
-
-
-# ==================================================
-# 13. آماده‌سازی داده
-# ==================================================
-
-try:
-
-    X, y, used_features = prepare_data(
-        df,
-        dataset_name,
-        mode
-    )
-
-except Exception as exc:
-
-    st.error(
-        "آماده‌سازی دیتاست با خطا مواجه شد."
-    )
-
-    st.code(str(exc))
-
-    st.stop()
-
-
-# ==================================================
-# 14. مدیریت نتایج قدیمی
-# ==================================================
-
-active_key = f"{dataset_name}_{mode}"
-
-if st.session_state.get("active_key") != active_key:
-
-    for key in [
-        "results",
-        "fitted_models",
-        "predictions",
-        "X_test",
-        "y_test",
-        "best_model_name",
-        "last_prediction"
-    ]:
-
-        st.session_state.pop(key, None)
-
-    st.session_state["active_key"] = active_key
-
-
-# ==================================================
-# 15. خلاصه دیتاست
-# ==================================================
-
-st.markdown(
-    '<div class="section-title">خلاصه دیتاست</div>',
-    unsafe_allow_html=True
-)
-
-c1, c2, c3 = st.columns(3)
-
-stats = [
-    ("تعداد نمونه‌ها", f"{len(X):,}"),
-    ("تعداد ویژگی‌ها", str(len(used_features))),
-    ("نمونه‌های مثبت", f"{int((y == 1).sum()):,}")
-]
-
-for col, (label, value) in zip(
-    [c1, c2, c3],
-    stats
-):
-
-    with col:
-
-        st.markdown(
-            f"""
-            <div class="stat-card">
-                <div class="stat-label">{label}</div>
-                <div class="stat-value">{value}</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-if dataset_name == "CDC":
-
-    st.caption(
-        "در دیتاست CDC، کلاس مثبت شامل پیش‌دیابت یا دیابت است."
-    )
-
-else:
-
-    st.caption(
-        "منشأ داده و نحوه تولید برچسب Kaggle باید در پژوهش بررسی شود."
-    )
-
-
-# ==================================================
-# 16. توابع فرم اطلاعات بیمار
-# ==================================================
-
-def yes_no_input(label, key):
-
-    value = st.selectbox(
-        label,
-        ["خیر", "بله"],
-        key=key
-    )
-
-    return 1 if value == "بله" else 0
-
-
-def make_user_input():
-
-    values = {}
-
-    if dataset_name == "CDC":
-
-        binary_labels = {
-
-            "HighBP": "فشار خون بالا",
-            "HighChol": "کلسترول بالا",
-            "CholCheck": "آزمایش کلسترول در ۵ سال اخیر",
-            "Smoker": "سابقه مصرف حداقل ۱۰۰ نخ سیگار",
-            "Stroke": "سابقه سکته مغزی",
-            "HeartDiseaseorAttack": "سابقه بیماری قلبی",
-            "PhysActivity": "فعالیت بدنی",
-            "Fruits": "مصرف روزانه میوه",
-            "Veggies": "مصرف روزانه سبزیجات",
-            "HvyAlcoholConsump": "مصرف زیاد الکل",
-            "AnyHealthcare": "دسترسی به خدمات درمانی",
-            "NoDocbcCost": "عدم مراجعه به پزشک به دلیل هزینه",
-            "DiffWalk": "مشکل در راه رفتن"
-        }
-
-        left, right = st.columns(2)
-
-        for i, (feature, label) in enumerate(
-            binary_labels.items()
-        ):
-
-            with left if i % 2 == 0 else right:
-
-                values[feature] = yes_no_input(
-                    label,
-                    f"cdc_{feature}"
-                )
-
-        left, right = st.columns(2)
-
-        with left:
-
-            values["BMI"] = st.number_input(
-                "شاخص توده بدنی (BMI)",
-                12,
-                90,
-                27
-            )
-
-            values["GenHlth"] = st.selectbox(
-                "وضعیت عمومی سلامت",
-                [1, 2, 3, 4, 5],
-                format_func=lambda x: {
-                    1: "عالی",
-                    2: "بسیار خوب",
-                    3: "خوب",
-                    4: "متوسط",
-                    5: "ضعیف"
-                }[x]
-            )
-
-            values["MentHlth"] = st.number_input(
-                "روزهای سلامت روان نامناسب در ماه",
-                0,
-                30,
-                0
-            )
-
-            values["PhysHlth"] = st.number_input(
-                "روزهای سلامت جسمانی نامناسب در ماه",
-                0,
-                30,
-                0
-            )
-
-        with right:
-
-            values["Sex"] = st.selectbox(
-                "جنسیت",
-                [0, 1],
-                format_func=lambda x:
-                    "زن" if x == 0 else "مرد"
-            )
-
-            values["Age"] = st.selectbox(
-                "گروه سنی",
-                list(range(1, 14)),
-                format_func=lambda x:
-                    f"گروه {x}"
-            )
-
-            values["Education"] = st.selectbox(
-                "سطح تحصیلات",
-                list(range(1, 7))
-            )
-
-            values["Income"] = st.selectbox(
-                "گروه درآمدی",
-                list(range(1, 9))
-            )
-
     else:
-
-        left, right = st.columns(2)
-
-        with left:
-
-            values["gender"] = st.selectbox(
-                "جنسیت",
-                ["Female", "Male", "Other"]
-            )
-
-            values["age"] = st.number_input(
-                "سن",
-                1,
-                100,
-                35
-            )
-
-            values["hypertension"] = yes_no_input(
-                "فشار خون بالا",
-                "kg_hypertension"
-            )
-
-            values["heart_disease"] = yes_no_input(
-                "سابقه بیماری قلبی",
-                "kg_heart"
-            )
-
-        with right:
-
-            values["smoking_history"] = st.selectbox(
-                "سابقه مصرف دخانیات",
-                [
-                    "never",
-                    "No Info",
-                    "current",
-                    "former",
-                    "ever",
-                    "not current"
-                ]
-            )
-
-            values["bmi"] = st.number_input(
-                "شاخص توده بدنی (BMI)",
-                10.0,
-                80.0,
-                27.0,
-                step=0.1
-            )
-
-            if mode == "همه ویژگی‌ها":
-
-                values["HbA1c_level"] = st.number_input(
-                    "مقدار HbA1c",
-                    3.0,
-                    20.0,
-                    5.5,
-                    step=0.1
-                )
-
-                values["blood_glucose_level"] = st.number_input(
-                    "قند خون (mg/dL)",
-                    50,
-                    500,
-                    100
-                )
-
-    return values
-
-
-# ==================================================
-# 17. فرم ورود اطلاعات و انتخاب الگوریتم
-# ==================================================
-
-st.divider()
-
-st.markdown(
-    '<div class="section-title">بررسی اطلاعات فرد</div>',
-    unsafe_allow_html=True
-)
-
-st.caption(
-    "اطلاعات را وارد کن و الگوریتم موردنظر را برای بررسی انتخاب کن."
-)
-
-available_models = list(
-    st.session_state.get("fitted_models", {}).keys()
-)
-
-with st.form("patient_form"):
-
-    if available_models:
-
-        selected_algorithm = st.selectbox(
-            "انتخاب الگوریتم",
-            available_models
-        )
-
-    else:
-
-        selected_algorithm = None
-
-        st.info(
-            "ابتدا الگوریتم‌ها را در بخش آموزش و مقایسه آموزش بده تا انتخاب مدل فعال شود."
-        )
-
-    user_values = make_user_input()
-
-    submitted = st.form_submit_button(
-        "بررسی اطلاعات",
-        use_container_width=True
-    )
-
-
-# ==================================================
-# 18. نتیجه پیش‌بینی با الگوریتم انتخاب‌شده
-# ==================================================
-
-if submitted:
-
-    if not st.session_state.get("fitted_models"):
-
-        st.warning(
-            "ابتدا مدل‌ها را در بخش آموزش الگوریتم‌ها آموزش بده."
-        )
-
-    elif selected_algorithm not in st.session_state["fitted_models"]:
-
-        st.warning(
-            "لطفاً یک الگوریتم معتبر انتخاب کن."
-        )
-
-    else:
-
-        model = st.session_state["fitted_models"][
-            selected_algorithm
-        ]
-
-        input_df = pd.DataFrame(
-            [user_values],
-            columns=used_features
-        )
-
-        prediction = int(
-            model.predict(input_df)[0]
-        )
-
-        score = float(
-            model.predict_proba(input_df)[0, 1]
-        )
-
-        st.session_state["last_prediction"] = {
-            "algorithm": selected_algorithm,
-            "prediction": prediction,
-            "score": score
-        }
-
-
-if st.session_state.get("last_prediction"):
-
-    last = st.session_state["last_prediction"]
-
-    if last["algorithm"] in st.session_state.get("fitted_models", {}):
-
-        st.divider()
-
-        st.markdown(
-            '<div class="section-title">نتیجه بررسی اطلاعات</div>',
-            unsafe_allow_html=True
-        )
-
-        st.info(
-            f"الگوریتم انتخاب‌شده: {last['algorithm']}"
-        )
-
-        positive_label = (
-            "پیش‌دیابت یا دیابت"
-            if dataset_name == "CDC"
-            else "دیابت"
-        )
-
-        if last["prediction"] == 1:
-
-            st.error(
-                f"نتیجه مدل: کلاس مثبت ({positive_label})"
-            )
-
-            st.markdown("""
-            **مدل بر اساس اطلاعات واردشده، فرد را در گروه مثبت قرار داده است.**
-
-            این نتیجه تشخیص قطعی دیابت نیست. برای بررسی وضعیت سلامت،
-            مراجعه به پزشک و انجام آزمایش‌های معتبر ضروری است.
-            """)
-
-        else:
-
-            st.success(
-                "نتیجه مدل: کلاس منفی"
-            )
-
-            st.markdown("""
-            **مدل بر اساس اطلاعات واردشده، فرد را در گروه منفی قرار داده است.**
-
-            این نتیجه بیماری را به‌طور قطعی رد نمی‌کند.
-            در صورت وجود علائم یا عوامل خطر، بررسی پزشکی همچنان ضروری است.
-            """)
-
-        st.markdown("### اطلاعات خروجی مدل")
-
-        c1, c2 = st.columns(2)
-
-        c1.metric(
-            "امتیاز خام مدل برای کلاس مثبت",
-            f"{last['score'] * 100:.1f}%"
-        )
-
-        c2.metric(
-            "طبقه‌بندی الگوریتم",
-            "مثبت" if last["prediction"] == 1 else "منفی"
-        )
-
-        st.caption(
-            "امتیاز نمایش‌داده‌شده خروجی خام predict_proba است؛ "
-            "این عدد احتمال بالینی کالیبره‌شده ابتلا به دیابت نیست."
-        )
-
-        if dataset_name == "CDC":
-
-            st.caption(
-                "در دیتاست CDC، کلاس مثبت شامل پیش‌دیابت یا دیابت است."
-            )
-
-
-# ==================================================
-# 19. آموزش و مقایسه الگوریتم‌ها
-# ==================================================
-
-st.divider()
-
-st.markdown(
-    '<div class="section-title">آموزش و مقایسه الگوریتم‌ها</div>',
-    unsafe_allow_html=True
-)
-
-st.caption(
-    "تمام الگوریتم‌ها با مجموعه آموزش و آزمون یکسان ارزیابی می‌شوند."
-)
-
-if st.button(
-    "آموزش و ارزیابی الگوریتم‌ها",
-    type="primary",
-    use_container_width=True
-):
-
-    try:
-
-        with st.spinner(
-            "در حال آموزش مدل‌ها؛ لطفاً منتظر بمان..."
-        ):
-
-            (
-                results,
-                fitted_models,
-                predictions,
-                X_test,
-                y_test
-            ) = train_and_evaluate(X, y)
-
-        best_name = results.iloc[0]["Algorithm"]
-
-        st.session_state["results"] = results
-        st.session_state["fitted_models"] = fitted_models
-        st.session_state["predictions"] = predictions
-        st.session_state["X_test"] = X_test
-        st.session_state["y_test"] = y_test
-        st.session_state["best_model_name"] = best_name
-
-        st.session_state.pop(
-            "last_prediction",
-            None
-        )
-
-        st.success(
-            f"آموزش کامل شد. مدل برتر بر اساس F1: {best_name}"
-        )
-
-    except Exception as exc:
-
-        st.error(
-            "آموزش الگوریتم‌ها با خطا مواجه شد."
-        )
-
-        st.exception(exc)
-
-
-# ==================================================
-# 20. نمایش نتایج ارزیابی
-# ==================================================
-
-if (
-    "results" in st.session_state
-    and st.session_state.get("active_key") == active_key
-):
-
-    results = st.session_state["results"]
-
-    st.divider()
-
+        mode = "همه ویژگی‌ها"
+        st.caption("در دیتاست CDC از ویژگی‌های موجود استفاده می‌شود.")
+
+    current_key = f"{dataset_name}_{mode}"
+
+    if st.session_state.active_key != current_key:
+        st.session_state.trained_models = None
+        st.session_state.results_df = None
+        st.session_state.X_test = None
+        st.session_state.y_test = None
+        st.session_state.last_prediction = None
+        st.session_state.active_key = current_key
+
+    st.markdown("---")
     st.markdown(
-        '<div class="section-title">نتایج ارزیابی الگوریتم‌ها</div>',
+        "<p style='color:#C5D7E3;font-size:11px;text-align:center;'>"
+        "نسخه پژوهشی | Machine Learning"
+        "</p>",
         unsafe_allow_html=True
     )
 
-    best = results.iloc[0]
 
-    a, b, c = st.columns(3)
+# =========================================================
+# هدر
+# =========================================================
 
-    a.metric(
-        "مدل برتر بر اساس F1",
-        best["Algorithm"]
+show_header()
+
+
+# =========================================================
+# داشبورد اصلی
+# =========================================================
+
+if page == "داشبورد اصلی":
+
+    section_title(
+        "نمای کلی سامانه",
+        "در این بخش وضعیت دیتاست و عملکرد کلی سامانه نمایش داده می‌شود."
     )
 
-    b.metric(
-        "صحت",
-        f'{best["Accuracy (%)"]:.2f}%'
+    try:
+        X, y, categorical, numeric, target_note = prepare_dataset(
+            dataset_name,
+            mode
+        )
+
+        total_records = len(X)
+        total_features = len(X.columns)
+        positive = int((y == 1).sum())
+        negative = int((y == 0).sum())
+
+        c1, c2, c3, c4 = st.columns(4)
+
+        with c1:
+            stat_card("📊", "تعداد کل رکوردها", f"{total_records:,}")
+
+        with c2:
+            stat_card("🧩", "تعداد ویژگی‌ها", str(total_features))
+
+        with c3:
+            stat_card("🟢", "کلاس مثبت", f"{positive:,}")
+
+        with c4:
+            stat_card("🔵", "کلاس منفی", f"{negative:,}")
+
+        section_title("وضعیت دیتاست")
+
+        col1, col2 = st.columns([1.2, 1])
+
+        with col1:
+            st.markdown("""
+            <div class="panel">
+                <div class="panel-title">📁 اطلاعات منبع داده</div>
+                <p class="panel-description">
+                    منبع انتخاب‌شده:
+                </p>
+            """, unsafe_allow_html=True)
+
+            st.markdown(
+                f"<div class='info-chip'>{dataset_name}</div>",
+                unsafe_allow_html=True
+            )
+
+            st.markdown(
+                f"<p style='color:#263746;margin-top:15px;'>"
+                f"نوع تحلیل: <b>{mode}</b></p>",
+                unsafe_allow_html=True
+            )
+
+            st.markdown(
+                f"<p style='color:#64748B;font-size:12px;'>{target_note}</p>",
+                unsafe_allow_html=True
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with col2:
+            distribution = pd.DataFrame({
+                "وضعیت": ["بدون دیابت", "گروه مثبت"],
+                "تعداد": [negative, positive]
+            })
+
+            st.markdown(
+                "<div class='panel-title'>📈 توزیع کلاس‌ها</div>",
+                unsafe_allow_html=True
+            )
+
+            st.bar_chart(
+                distribution.set_index("وضعیت"),
+                color="#079B91"
+            )
+
+        section_title("نمونه‌ای از داده‌ها")
+        st.dataframe(
+            make_styler(X.head(10)),
+            use_container_width=True
+        )
+
+    except Exception as e:
+        st.error(str(e))
+        st.info(
+            "ابتدا فایل دیتاست را در پوشه dataset پروژه قرار دهید."
+        )
+
+
+# =========================================================
+# آموزش و ارزیابی مدل‌ها
+# =========================================================
+
+elif page == "آموزش و ارزیابی مدل‌ها":
+
+    section_title(
+        "آموزش الگوریتم‌های یادگیری ماشین",
+        "الگوریتم‌ها با داده‌های آموزشی آموزش داده شده و روی داده‌های آزمون ارزیابی می‌شوند."
     )
 
-    c.metric(
-        "امتیاز F1",
-        f'{best["F1 (%)"]:.2f}%'
-    )
+    st.markdown("""
+    <div class="panel">
+        <div class="panel-title">⚙️ تنظیمات آموزش</div>
+        <p class="panel-description">
+            داده‌ها به دو بخش آموزش و آزمون تقسیم می‌شوند.
+            ۸۰ درصد داده‌ها برای آموزش و ۲۰ درصد برای آزمون استفاده می‌شود.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    display_results = results.rename(
-        columns={
-            "Algorithm": "الگوریتم",
-            "Accuracy (%)": "صحت",
-            "Error (%)": "خطا",
-            "Precision (%)": "Precision",
-            "Recall (%)": "Recall",
-            "F1 (%)": "F1",
-            "ROC-AUC (%)": "ROC-AUC",
-            "PR-AUC (%)": "PR-AUC",
-            "Balanced Accuracy (%)": "صحت متوازن"
-        }
-    )
-
-    st.dataframe(
-        display_results.style.format({
-            col: "{:.2f}%"
-            for col in display_results.columns
-            if col != "الگوریتم"
-        }),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    with st.expander("نمودار مقایسه صحت و خطا"):
-
-        chart = results.set_index(
-            "Algorithm"
-        )[[
-            "Accuracy (%)",
-            "Error (%)"
-        ]]
-
-        st.bar_chart(chart)
-
-    with st.expander("جزئیات خطاهای الگوریتم‌ها"):
-
-        selected = st.selectbox(
-            "انتخاب الگوریتم برای مشاهده جزئیات",
-            list(st.session_state["fitted_models"].keys()),
-            key="confusion_model"
+    try:
+        X, y, categorical, numeric, target_note = prepare_dataset(
+            dataset_name,
+            mode
         )
 
-        y_test = st.session_state["y_test"]
-
-        predicted = st.session_state[
-            "predictions"
-        ][selected]["predicted"]
-
-        cm = confusion_matrix(
-            y_test,
-            predicted,
-            labels=[0, 1]
+        st.info(
+            f"تعداد رکوردها: {len(X):,} | "
+            f"تعداد ویژگی‌ها: {len(X.columns)}"
         )
 
-        tn, fp, fn, tp = cm.ravel()
+        st.caption(target_note)
 
-        fig, ax = plt.subplots(figsize=(5.5, 3.6))
+        if st.button(
+            "🚀 شروع آموزش و ارزیابی الگوریتم‌ها",
+            use_container_width=True
+        ):
+            try:
+                st.session_state.last_prediction = None
 
-        ax.imshow(
-            cm,
-            cmap="Blues"
-        )
-
-        ax.set_xlabel("Predicted")
-        ax.set_ylabel("Actual")
-
-        ax.set_xticks(
-            [0, 1],
-            ["Negative", "Positive"]
-        )
-
-        ax.set_yticks(
-            [0, 1],
-            ["Negative", "Positive"]
-        )
-
-        for i in range(2):
-            for j in range(2):
-
-                ax.text(
-                    j,
-                    i,
-                    f"{cm[i, j]:,}",
-                    ha="center",
-                    va="center",
-                    color="black"
+                trained, results, X_test, y_test = train_all_models(
+                    X,
+                    y,
+                    categorical,
+                    numeric
                 )
 
-        st.pyplot(fig)
-        plt.close(fig)
+                st.session_state.trained_models = trained
+                st.session_state.results_df = results
+                st.session_state.X_test = X_test
+                st.session_state.y_test = y_test
 
-        q1, q2, q3, q4 = st.columns(4)
+                st.success("مدل‌ها با موفقیت آموزش داده شدند.")
 
-        q1.metric("مثبت درست (TP)", f"{tp:,}")
-        q2.metric("منفی درست (TN)", f"{tn:,}")
-        q3.metric("مثبت اشتباه (FP)", f"{fp:,}")
-        q4.metric("منفی اشتباه (FN)", f"{fn:,}")
+            except Exception as e:
+                st.error(f"خطا در فرایند آموزش: {e}")
 
-    with st.expander("راهنمای معیارهای ارزیابی"):
+        if st.session_state.results_df is not None:
 
-        st.markdown("""
-        - **Accuracy:** درصد کل پیش‌بینی‌های درست.
-        - **Error:** درصد کل پیش‌بینی‌های نادرست.
-        - **Precision:** دقت پیش‌بینی‌های مثبت.
-        - **Recall:** میزان شناسایی نمونه‌های مثبت واقعی.
-        - **F1:** توازن میان Precision و Recall.
-        - **ROC-AUC:** توان تفکیک دو کلاس.
-        - **PR-AUC:** معیار مهم برای داده‌های نامتوازن.
-        - **Balanced Accuracy:** میانگین عملکرد در دو کلاس.
-        """)
+            results = st.session_state.results_df
+
+            section_title("مقایسه عملکرد الگوریتم‌ها")
+
+            display_columns = [
+                "الگوریتم",
+                "دقت",
+                "Precision",
+                "Recall",
+                "F1",
+                "ROC-AUC",
+                "PR-AUC",
+                "Balanced Accuracy",
+                "زمان آموزش (ثانیه)"
+            ]
+
+            formatted = results[display_columns].copy()
+
+            for col in [
+                "دقت",
+                "Precision",
+                "Recall",
+                "F1",
+                "ROC-AUC",
+                "PR-AUC",
+                "Balanced Accuracy"
+            ]:
+                formatted[col] = formatted[col].apply(
+                    lambda x: f"{x:.4f}" if pd.notna(x) else "ناموجود"
+                )
+
+            formatted["زمان آموزش (ثانیه)"] = (
+                formatted["زمان آموزش (ثانیه)"].apply(
+                    lambda x: f"{x:.2f}"
+                )
+            )
+
+            st.dataframe(
+                make_styler(formatted),
+                use_container_width=True,
+                hide_index=True
+            )
+
+            best_model = results.iloc[0]
+
+            st.markdown(f"""
+            <div class="panel">
+                <div class="panel-title">🏆 بهترین الگوریتم بر اساس F1</div>
+                <h2 style="color:#079B91 !important;">
+                    {best_model['الگوریتم']}
+                </h2>
+                <p style="color:#263746 !important;">
+                    امتیاز F1:
+                    <b>{best_model['F1']:.4f}</b>
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            section_title("نمودار مقایسه الگوریتم‌ها")
+
+            chart_df = results.set_index("الگوریتم")[
+                ["دقت", "Precision", "Recall", "F1"]
+            ]
+
+            st.bar_chart(
+                chart_df,
+                use_container_width=True
+            )
+
+            section_title("ماتریس درهم‌ریختگی")
+
+            selected_for_matrix = st.selectbox(
+                "الگوریتم موردنظر برای مشاهده ماتریس:",
+                list(st.session_state.trained_models.keys())
+            )
+
+            model = st.session_state.trained_models[
+                selected_for_matrix
+            ]
+
+            predictions = model.predict(st.session_state.X_test)
+
+            cm = confusion_matrix(
+                st.session_state.y_test,
+                predictions,
+                labels=[0, 1]
+            )
+
+            fig, ax = plt.subplots(figsize=(5, 3.8))
+            fig.patch.set_facecolor("#FFFFFF")
+            ax.set_facecolor("#FFFFFF")
+
+            image = ax.imshow(
+                cm,
+                interpolation="nearest",
+                cmap="GnBu"
+            )
+
+            ax.set_title(
+                "Confusion Matrix",
+                color="#173B57",
+                fontsize=13,
+                fontweight="bold"
+            )
+
+            ax.set_xlabel("Predicted Label", color="#263746")
+            ax.set_ylabel("Actual Label", color="#263746")
+
+            ax.set_xticks([0, 1])
+            ax.set_yticks([0, 1])
+            ax.set_xticklabels(
+                ["Negative", "Positive"],
+                color="#263746"
+            )
+            ax.set_yticklabels(
+                ["Negative", "Positive"],
+                color="#263746"
+            )
+
+            threshold = cm.max() / 2 if cm.max() > 0 else 0
+
+            for i in range(2):
+                for j in range(2):
+                    ax.text(
+                        j,
+                        i,
+                        str(cm[i, j]),
+                        ha="center",
+                        va="center",
+                        color="#102D43" if cm[i, j] < threshold else "#FFFFFF",
+                        fontsize=13,
+                        fontweight="bold"
+                    )
+
+            fig.colorbar(image, ax=ax)
+            fig.tight_layout()
+
+            st.pyplot(fig)
+            plt.close(fig)
+
+    except Exception as e:
+        st.error(str(e))
 
 
-# ==================================================
-# 21. توضیحات پژوهشی
-# ==================================================
+# =========================================================
+# پیش‌بینی بیمار
+# =========================================================
 
-with st.expander("درباره دیتاست و محدودیت‌های پژوهش"):
+elif page == "پیش‌بینی بیمار":
 
-    if dataset_name == "CDC":
+    section_title(
+        "ارزیابی اطلاعات بیمار",
+        "اطلاعات زیر را وارد کنید تا مدل انتخاب‌شده نتیجه غربالگری را ارائه دهد."
+    )
 
-        st.write(
-            "در نسخه دودویی دیتاست CDC، کلاس مثبت شامل پیش‌دیابت یا دیابت است؛ "
-            "بنابراین خروجی مدل نباید تشخیص قطعی دیابت معرفی شود."
+    if st.session_state.trained_models is None:
+        st.warning(
+            "ابتدا از بخش «آموزش و ارزیابی مدل‌ها» الگوریتم‌ها را آموزش دهید."
         )
 
     else:
 
-        st.write(
-            "دیتاست Kaggle شامل متغیرهای بالینی و آزمایشگاهی است. "
-            "منشأ داده و نحوه تولید برچسب باید پیش از نتیجه‌گیری علمی بررسی شود."
+        model_names = list(
+            st.session_state.trained_models.keys()
         )
 
-    st.write("""
-    این نسخه یک نمونه اولیه پژوهشی است.
+        selected_algorithm = st.selectbox(
+            "🤖 الگوریتم مورد استفاده برای پیش‌بینی",
+            model_names
+        )
 
-    برای تبدیل آن به پژوهش قابل انتشار، مراحل زیر نیز لازم هستند:
+        st.markdown("""
+        <div class="panel">
+            <div class="panel-title">👤 اطلاعات فردی و پزشکی</div>
+            <p class="panel-description">
+                اطلاعات را تا حد امکان دقیق وارد کنید.
+                نتیجه صرفاً خروجی مدل یادگیری ماشین است.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
-    - اعتبارسنجی متقاطع
-    - محاسبه فاصله اطمینان
-    - بررسی کالیبراسیون مدل
-    - تحلیل اهمیت ویژگی‌ها با SHAP
-    - بررسی داده‌های تکراری و نشت اطلاعات
-    - اعتبارسنجی خارجی روی داده مستقل
+        patient_data = {}
+
+        if dataset_name == "دیتاست Kaggle":
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                patient_data["gender"] = st.selectbox(
+                    "جنسیت",
+                    ["Male", "Female"]
+                )
+
+                patient_data["age"] = st.number_input(
+                    "سن",
+                    min_value=1,
+                    max_value=120,
+                    value=35
+                )
+
+                patient_data["hypertension"] = st.selectbox(
+                    "سابقه فشار خون بالا",
+                    [0, 1],
+                    format_func=lambda x: "دارد" if x == 1 else "ندارد"
+                )
+
+                patient_data["heart_disease"] = st.selectbox(
+                    "سابقه بیماری قلبی",
+                    [0, 1],
+                    format_func=lambda x: "دارد" if x == 1 else "ندارد"
+                )
+
+            with col2:
+                patient_data["smoking_history"] = st.selectbox(
+                    "سابقه مصرف دخانیات",
+                    [
+                        "never",
+                        "No Info",
+                        "current",
+                        "former",
+                        "ever",
+                        "not current"
+                    ]
+                )
+
+                patient_data["bmi"] = st.number_input(
+                    "شاخص توده بدنی (BMI)",
+                    min_value=10.0,
+                    max_value=80.0,
+                    value=25.0,
+                    step=0.1
+                )
+
+                if mode == "همه ویژگی‌ها":
+                    patient_data["HbA1c_level"] = st.number_input(
+                        "سطح HbA1c",
+                        min_value=3.0,
+                        max_value=20.0,
+                        value=5.5,
+                        step=0.1
+                    )
+
+                    patient_data["blood_glucose_level"] = st.number_input(
+                        "قند خون",
+                        min_value=50,
+                        max_value=500,
+                        value=100
+                    )
+
+        else:
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                patient_data["HighBP"] = st.selectbox(
+                    "فشار خون بالا",
+                    [0, 1],
+                    format_func=lambda x: "بله" if x else "خیر"
+                )
+
+                patient_data["HighChol"] = st.selectbox(
+                    "کلسترول بالا",
+                    [0, 1],
+                    format_func=lambda x: "بله" if x else "خیر"
+                )
+
+                patient_data["CholCheck"] = st.selectbox(
+                    "آزمایش کلسترول در ۵ سال گذشته",
+                    [0, 1],
+                    format_func=lambda x: "بله" if x else "خیر"
+                )
+
+                patient_data["BMI"] = st.number_input(
+                    "شاخص توده بدنی",
+                    min_value=10,
+                    max_value=80,
+                    value=25
+                )
+
+                patient_data["Smoker"] = st.selectbox(
+                    "مصرف سیگار",
+                    [0, 1],
+                    format_func=lambda x: "بله" if x else "خیر"
+                )
+
+                patient_data["Stroke"] = st.selectbox(
+                    "سابقه سکته مغزی",
+                    [0, 1],
+                    format_func=lambda x: "بله" if x else "خیر"
+                )
+
+                patient_data["HeartDiseaseorAttack"] = st.selectbox(
+                    "سابقه بیماری قلبی یا حمله قلبی",
+                    [0, 1],
+                    format_func=lambda x: "بله" if x else "خیر"
+                )
+
+                patient_data["PhysActivity"] = st.selectbox(
+                    "فعالیت بدنی منظم",
+                    [0, 1],
+                    format_func=lambda x: "بله" if x else "خیر"
+                )
+
+                patient_data["Fruits"] = st.selectbox(
+                    "مصرف روزانه میوه",
+                    [0, 1],
+                    format_func=lambda x: "بله" if x else "خیر"
+                )
+
+                patient_data["Veggies"] = st.selectbox(
+                    "مصرف روزانه سبزیجات",
+                    [0, 1],
+                    format_func=lambda x: "بله" if x else "خیر"
+                )
+
+                patient_data["HvyAlcoholConsump"] = st.selectbox(
+                    "مصرف زیاد نوشیدنی الکلی",
+                    [0, 1],
+                    format_func=lambda x: "بله" if x else "خیر"
+                )
+
+            with col2:
+                patient_data["AnyHealthcare"] = st.selectbox(
+                    "دسترسی به خدمات درمانی",
+                    [0, 1],
+                    format_func=lambda x: "بله" if x else "خیر"
+                )
+
+                patient_data["NoDocbcCost"] = st.selectbox(
+                    "عدم مراجعه به پزشک به دلیل هزینه",
+                    [0, 1],
+                    format_func=lambda x: "بله" if x else "خیر"
+                )
+
+                patient_data["GenHlth"] = st.selectbox(
+                    "وضعیت عمومی سلامت",
+                    [1, 2, 3, 4, 5],
+                    format_func=lambda x: {
+                        1: "عالی",
+                        2: "خیلی خوب",
+                        3: "خوب",
+                        4: "متوسط",
+                        5: "ضعیف"
+                    }[x]
+                )
+
+                patient_data["MentHlth"] = st.number_input(
+                    "تعداد روزهای سلامت روان نامناسب در ماه",
+                    min_value=0,
+                    max_value=30,
+                    value=0
+                )
+
+                patient_data["PhysHlth"] = st.number_input(
+                    "تعداد روزهای سلامت جسمی نامناسب در ماه",
+                    min_value=0,
+                    max_value=30,
+                    value=0
+                )
+
+                patient_data["DiffWalk"] = st.selectbox(
+                    "مشکل در راه رفتن یا بالا رفتن از پله",
+                    [0, 1],
+                    format_func=lambda x: "بله" if x else "خیر"
+                )
+
+                patient_data["Sex"] = st.selectbox(
+                    "جنسیت",
+                    [0, 1],
+                    format_func=lambda x: "زن" if x == 0 else "مرد"
+                )
+
+                patient_data["Age"] = st.selectbox(
+                    "گروه سنی",
+                    list(range(1, 14)),
+                    format_func=lambda x: f"گروه {x}"
+                )
+
+                patient_data["Education"] = st.selectbox(
+                    "سطح تحصیلات",
+                    list(range(1, 7))
+                )
+
+                patient_data["Income"] = st.selectbox(
+                    "سطح درآمد",
+                    list(range(1, 9))
+                )
+
+        st.markdown("---")
+
+        if st.button(
+            "🔍 انجام پیش‌بینی با الگوریتم انتخاب‌شده",
+            use_container_width=True
+        ):
+
+            try:
+                model = st.session_state.trained_models[
+                    selected_algorithm
+                ]
+
+                input_df = pd.DataFrame([patient_data])
+
+                expected_columns = st.session_state.X_test.columns
+                input_df = input_df.reindex(
+                    columns=expected_columns
+                )
+
+                prediction = int(model.predict(input_df)[0])
+
+                score = None
+
+                if hasattr(model, "predict_proba"):
+                    try:
+                        score = float(
+                            model.predict_proba(input_df)[0][1]
+                        )
+                    except Exception:
+                        score = None
+
+                st.session_state.last_prediction = {
+                    "algorithm": selected_algorithm,
+                    "prediction": prediction,
+                    "score": score
+                }
+
+            except Exception as e:
+                st.error(f"خطا در پیش‌بینی: {e}")
+
+        result = st.session_state.last_prediction
+
+        if result is not None:
+
+            if result["prediction"] == 1:
+
+                st.markdown("""
+                <div style="
+                    background:#FFF0F0;
+                    border:1px solid #F2C6CA;
+                    border-radius:16px;
+                    padding:22px;
+                    text-align:center;
+                    margin-top:20px;
+                    direction:rtl;">
+                    <div style="font-size:36px;color:#C43D4B;">⚠️</div>
+                    <h2 style="color:#B83243 !important;">
+                        نتیجه مدل: گروه مثبت
+                    </h2>
+                    <p style="color:#71343B !important;">
+                        مدل، فرد را در گروه مثبت از نظر برچسب دیابت این دیتاست قرار داده است.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            else:
+
+                st.markdown("""
+                <div style="
+                    background:#EAF8F1;
+                    border:1px solid #BDE5D0;
+                    border-radius:16px;
+                    padding:22px;
+                    text-align:center;
+                    margin-top:20px;
+                    direction:rtl;">
+                    <div style="font-size:36px;color:#16865B;">✓</div>
+                    <h2 style="color:#14764F !important;">
+                        نتیجه مدل: گروه منفی
+                    </h2>
+                    <p style="color:#285B46 !important;">
+                        مدل، فرد را در گروه منفی از نظر برچسب دیابت این دیتاست قرار داده است.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.markdown(
+                f"<p style='color:#263746;text-align:center;margin-top:15px;'>"
+                f"الگوریتم استفاده‌شده: <b>{result['algorithm']}</b></p>",
+                unsafe_allow_html=True
+            )
+
+            if result["score"] is not None:
+                st.metric(
+                    "امتیاز خروجی مدل برای کلاس مثبت",
+                    f"{result['score'] * 100:.2f}%"
+                )
+
+                st.caption(
+                    "این عدد امتیاز خروجی مدل است و لزوماً احتمال بالینیِ کالیبره‌شده نیست."
+                )
+
+            st.warning(
+                "این نتیجه صرفاً خروجی یک مدل پژوهشی و غربالگری است؛ "
+                "تشخیص پزشکی محسوب نمی‌شود. برای تشخیص قطعی باید آزمایش‌ها "
+                "و نظر پزشک بررسی شوند."
+            )
+
+
+# =========================================================
+# درباره پروژه
+# =========================================================
+
+elif page == "درباره پروژه":
+
+    section_title("معرفی سامانه")
+
+    st.markdown("""
+    <div class="panel">
+        <div class="panel-title">🩺 سامانه هوشمند غربالگری دیابت</div>
+        <p class="panel-description">
+            این پروژه با هدف بررسی کاربرد الگوریتم‌های یادگیری ماشین
+            در تحلیل داده‌های سلامت و شناسایی الگوهای مرتبط با دیابت
+            طراحی شده است.
+        </p>
+        <p style="color:#263746 !important;">
+            در این سامانه، داده‌های پزشکی پس از پیش‌پردازش در اختیار
+            چند الگوریتم یادگیری ماشین قرار می‌گیرند. عملکرد الگوریتم‌ها
+            با معیارهای مختلف ارزیابی و با یکدیگر مقایسه می‌شود.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    section_title("الگوریتم‌های مورد استفاده")
+
+    algorithms = [
+        ("رگرسیون لجستیک", "مدل پایه برای دسته‌بندی داده‌ها"),
+        ("درخت تصمیم", "مدل قابل تفسیر برای تصمیم‌گیری"),
+        ("جنگل تصادفی", "ترکیب چندین درخت تصمیم"),
+        ("درخت‌های بسیار تصادفی", "روش ensemble مبتنی بر درخت"),
+        ("گرادیان بوستینگ", "مدل تقویتی برای یادگیری الگوها"),
+        ("XGBoost", "الگوریتم تقویتی پیشرفته، در صورت نصب بودن کتابخانه")
+    ]
+
+    for name, description in algorithms:
+        st.markdown(f"""
+        <div class="panel" style="padding:14px 18px;">
+            <div class="panel-title" style="font-size:15px;">
+                🧠 {name}
+            </div>
+            <div class="panel-description">{description}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    section_title("معیارهای ارزیابی")
+
+    st.markdown("""
+    - Accuracy: میزان پیش‌بینی‌های صحیح
+    - Precision: دقت پیش‌بینی کلاس مثبت
+    - Recall: توانایی شناسایی نمونه‌های مثبت
+    - F1-score: میانگین هماهنگ Precision و Recall
+    - ROC-AUC: توانایی تفکیک دو کلاس
+    - PR-AUC: ارزیابی عملکرد کلاس مثبت
+    - Balanced Accuracy: میانگین عملکرد روی دو کلاس
     """)
 
+    st.warning(
+        "عملکرد مناسب روی یک دیتاست به‌تنهایی نشان‌دهنده اعتبار بالینی مدل نیست. "
+        "برای استفاده پزشکی به اعتبارسنجی مستقل و بررسی تخصصی نیاز است."
+    )
 
-# ==================================================
-# 22. پانوشت
-# ==================================================
+
+# =========================================================
+# فوتر
+# =========================================================
 
 st.markdown("""
-<div style="
-    text-align:center;
-    color:#607584;
-    padding:25px 0 5px 0;
-    font-size:12px;
-">
-سامانه هوشمند غربالگری دیابت
-<br>
-پروژه پژوهشی یادگیری ماشین
+<div class="footer">
+    سامانه پژوهشی غربالگری دیابت | طراحی‌شده با Python و Streamlit
+    <br>
+    Machine Learning Based Diabetes Screening
 </div>
 """, unsafe_allow_html=True)
